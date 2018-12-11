@@ -5,88 +5,83 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace LC_Sharp {
+	class Program {
+		public static void Main(string[] args) {
+			
+		}
+	}
+
+	//GUI handler class
+	class Window {
+
+	}
+
+	//LC3 simulator class
 	class LC3 {
-		short bus, mar, mdr, pc, ir;
 
-		static void Main(string[] args) {
-			/*
-			short s = ~0b0000000000000001 + 1;
-			Console.WriteLine(s);
-			Console.WriteLine(s.AsBits());
-			*/
-			short s = -1 - 1;
-			Console.WriteLine(s);
-			Console.WriteLine(s.AsBits());
+		Memory memory;
+		public ushort bus;
+		public LC3() {
 
-			Console.WriteLine(s.GetBits(15, 12) == ~0b0001 + 1);
-			Console.ReadLine();
 		}
 
-		public void Run() {
+		public void Execute(ushort instruction) {
+			//Get the opcode;
+			switch(instruction >> 12) {
+				case 0b0000:
+					break;
+				case 0b0001:
+					break;
+			}
+		}
+		//We move data by simulating the assertion of control signals
+		public void Assert(Signals s) {
+			switch(s) {
+				case Signals.LD_MAR:
+					memory.ldMAR();
+					break;
+				case Signals.LD_MDR:
+					memory.ldMDR();
+					break;
 
+				case Signals.GATE_MAR:
+					memory.gateMAR();
+					break;
+				case Signals.GATE_MDR:
+					memory.gateMDR();
+					break;
+			}
 		}
 	}
-
-	public static class Word {
-		/*
-		public static bool[] AsBits(this short s) {
-			bool[] value = new bool[16];
-			for (int i = 0; i < 16; i++) {
-				value[i] = s % 2 == 1;
-				s /= 2;
-			}
-			return value;
+	enum Signals {
+		LD_MAR, LD_MDR,
+		GATE_MAR, GATE_MDR,
+	}
+	class Memory {
+		private LC3 lc3;
+		private ushort mar, mdr;
+		private Dictionary<ushort, ushort> mem;    //Lazily initialized memory (we only create entries right when we set or get)
+		public Memory(LC3 lc3) {
+			this.lc3 = lc3;
+			mem = new Dictionary<ushort, ushort>();
 		}
-		public static short GetBits(this bool[] value, int start, int end) {
-			//Index decreases from left to right, starting at 15
-			short result = 0;
-			for (int i = start; i >= end; i--) {
-				if (value[i])
-					result++;
-				result *= 2;
-			}
-			return result;
-		}
-		public static short GetBits(this short s, int start, int end) {
-			return s.AsBits().GetBits(start, end);
-		}
-		*/
-		public static string AsBits(this short s) {
-			string result = "";
-			if(s < 0) {
-				result = "1";
-				s = (short)(~s);
-				for (int i = 14; i > -1; i--) {
-					short power = (short)Math.Pow(2, i);
-					if (s >= power) {
-						s -= power;
-						result += "0";
-					} else {
-						result += "1";
-					}
-				}
+		//Control signal methods
+		public void ldMAR() => mar = lc3.bus;
+		public void ldMDR() => mdr = lc3.bus;
+		public void gateMAR() => lc3.bus = mar;
+		public void gateMDR() => lc3.bus = mdr;
+		public void memEnR() {
+			if(mem.ContainsKey(mar)) {
+				mdr = mem[mar];
 			} else {
-				result = "0";
-				for (int i = 14; i > -1; i--) {
-					short power = (short)Math.Pow(2, i);
-					if (s >= power) {
-						s -= power;
-						result += "1";
-					} else {
-						result += "0";
-					}
-				}
+				//Lazily initialize the address
+				mem[mar] = 0;
+				mdr = 0;
 			}
-			return result;
 		}
-		public static short GetBits(this short s, int start, int end) {
-			//We assume that end is lower than start
-			//Delete the bits before the start
-			short rightShift = (short) (15 - start);
-			s = (short)((s << rightShift) >> rightShift);
-			//The end becomes the MSB
-			s = (short)(s >> end);
-			return s;
+		public void memEnW() {
+			mem[mar] = mdr;
 		}
 	}
+
 }
