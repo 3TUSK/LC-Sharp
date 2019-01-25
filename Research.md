@@ -8,3 +8,10 @@ We researched existing LC-3 programs through GitHub to determine a base for our 
 - https://github.com/edga/lc3
   - An advanced LC-3 toolset that includes a tiny operating system with functioning interrupts.
   - http://www.cs.utexas.edu/users/fussell/courses/cs310h/simulator/lc3db/index.html#download
+- https://github.com/TricksterGuy/complx
+  - A comprehensive ~~(and of course complex)~~ LC-3 toolset, including assembler, simulator, debugging facilities, GUI editor and even an auto-grader...
+  - Supports all instructions (including interrupts/`RTI`), according to its README
+  - PyLC3 binding support
+- https://github.com/chiragsakhuja/lc3tools
+  - Another LC-3 toolset<!-- from U Teaxs -->, including assembler, simulator and garder.
+  - Cross-platform, supports interrupts (according to its README)
