@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace LC_Sharp {
 	class Program {
+        //Note to self: do not use left shift to remove left bits since operands get converted to ints first
 		public static void Main(string[] args) {
 
             Console.WriteLine($"0b10000 = {(ushort)0b10000} => {((ushort) (0b10000)).ToSigned(5)}");
