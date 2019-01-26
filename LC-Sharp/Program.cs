@@ -9,17 +9,17 @@ namespace LC_Sharp {
         //Note to self: do not use left shift to remove left bits since operands get converted to ints first
 		public static void Main(string[] args) {
 
-            Console.WriteLine($"0b10000 = {(ushort)0b10000} => {((ushort) (0b10000)).ToSigned(5)}");
-            Console.ReadLine();
+            //Console.WriteLine($"0b10000 = {(ushort)0b10000} => {((ushort) (0b10000)).ToSigned(5)}");
+            //Console.ReadLine();
 
-            Console.WriteLine(((0b0000_111_0_0000_0111 << 99) >> 99).ToString("X"));
-            Console.ReadLine();
+            //Console.WriteLine(((0b0000_111_0_0000_0111 << 99) >> 99).ToString("X"));
+            //Console.ReadLine();
             var c = new LC3();
             var a = new Assembler(c);
-            a.Label(0x3000, "TEST");
-            //a.AssembleToPC("BRnzp TEST");
-            //a.DissembleToPC();
-            c.memory.WriteToMemory(0x3000, 0b0000_010_0_0000_0111);
+            a.Label(0x2FF0, "TEST");
+            a.AssembleToPC("BRnzp TEST");
+            a.DissembleToPC();
+            //c.memory.WriteToMemory(0x3000, 0b0000_010_0_0000_0111);
             c.Fetch();
             c.DebugPrint();
             //Console.WriteLine($"Assembled: {a.DissembleIR()}");
@@ -130,10 +130,10 @@ namespace LC_Sharp {
                             Console.WriteLine($"Destination: {destination}");
 
                             short offset = (short) (destination - pc);
-                            if(offset < -0b111111111 || offset > 0b011111111) {
+                            if(offset < -0b100000000 || offset > 0b011111111) {
                                 throw new Exception($"Line {line}: Destination offset {offset} overflows 9-bit integer in {instruction}");
                             } else {
-                                result |= (ushort) ((offset << 7) >> 7);
+                                result |= (ushort) (offset & 0b111111111);
                             }
                         } else {
                             throw new Exception($"Line {line}: Unknown destination label {label} in {instruction}");
@@ -154,7 +154,7 @@ namespace LC_Sharp {
                     bool n = (instruction & 0x0800) > 0;
                     bool z = (instruction & 0x0400) > 0;
                     bool p = (instruction & 0x0200) > 0;
-                    short offset9 = ((ushort)((instruction << 7) >> 7)).ToSigned(9);
+                    short offset9 = ((ushort)(instruction & 0b1_1111_1111)).ToSigned(9);
                     
                     return $"BR{(n ? "n" : "")}{(z ? "z" : "")}{(p ? "p" : "")} {(labelsReverse.TryGetValue((ushort)(pc + offset9), out string label) ? label : Convert.ToString(offset9, 10))}";
                 default:
@@ -244,9 +244,9 @@ namespace LC_Sharp {
         public ADDR2MUX addr2mux;
         private short addr2 =>
             (short) (
-                addr2mux == ADDR2MUX.ir11 ? ((ushort) ((ir << 5) >> 5)).ToSigned(11) :
-                addr2mux == ADDR2MUX.ir9 ? ((ushort)((ir << 7) >> 7)).ToSigned(9) :
-                addr2mux == ADDR2MUX.ir6 ? ((ushort)((ir << 10) >> 10)).ToSigned(6) :
+                addr2mux == ADDR2MUX.ir11 ? ((ushort) (ir & 0b111_1111_1111)).ToSigned(11) :
+                addr2mux == ADDR2MUX.ir9 ? ((ushort)(ir & 0b1_1111_1111)).ToSigned(9) :
+                addr2mux == ADDR2MUX.ir6 ? ((ushort)(ir & 0b11_1111)).ToSigned(6) :
                 0);
         //AddrAdd
         public ushort addradd => (ushort) (addr1 + addr2);
@@ -269,8 +269,8 @@ namespace LC_Sharp {
         }
         public SR1MUX sr1mux;
         public ushort sr1out => registers[
-            sr1mux == SR1MUX.ir8_6 ? (((ir >> 6) << 13) >> 7) :
-            ((ir >> 9) << 13) >> 4
+            sr1mux == SR1MUX.ir8_6 ? (ir & 0b111000000) :
+            (ir & 0b0000111000000000)
             ];
         private LC3 lc3;
         public ushort pc { get; private set; }
