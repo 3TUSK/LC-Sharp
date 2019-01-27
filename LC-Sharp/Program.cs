@@ -174,9 +174,9 @@ namespace LC_Sharp {
                             Error($"Invalid operand");
                         }
                         result |= 0b1_00000;
-                        result |= (ushort)imm5;
+                        result |= imm5;
                     } else {
-                        result |= (ushort)sr2;
+                        result |= sr2;
                     }
                     break;
                 default:
@@ -209,6 +209,7 @@ namespace LC_Sharp {
     //When the MSB is one, the other bits represent the value to add to -2^n
     //If the unsigned value is greater than the max signed value (the MSB must be one), that means we subtract the max unsigned value to get the signed value 
     public static class UShort {
+        //Functions to be used with ushorts containing smaller-sized numbers
         //Converts ushort to short with equivalent bit pattern
         public static short ToSigned(this ushort unsigned, int n = 16) {
             ushort maxUnsigned = (ushort) Math.Pow(2, n);   //0b1111111111111111
@@ -225,7 +226,7 @@ namespace LC_Sharp {
             ushort maxUnsigned = (ushort)Math.Pow(2, n); //0b1111111111111111
             if(signed < 0) {
                 //256 + (-1) = 255, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0001 = 0b1111_1111_1111_1111
-                //256 + (-2) = 255, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0010 = 0b1111_1111_1111_1110
+                //256 + (-2) = 254, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0010 = 0b1111_1111_1111_1110
                 return (ushort)(maxUnsigned + signed);
             } else {
                 return (ushort)signed;
@@ -235,6 +236,7 @@ namespace LC_Sharp {
 	//LC3 simulator class
 	public class LC3 {
         public Control control;
+        public Processing processing;
 		public Memory memory;
 		public ushort bus;
 		public LC3() {
@@ -250,7 +252,7 @@ namespace LC_Sharp {
             memory.memEnR();
             memory.gateMDR();
             control.ldIR();
-            control.pcmux = Control.PCMUX.inc;
+            processing.pcmux = Processing.PCMUX.inc;
             control.ldPC();
         }
         public void Execute() => Execute(control.ir);
@@ -259,46 +261,34 @@ namespace LC_Sharp {
 			switch(instruction >> 12) {
 				case 0b0000:
                     //Fun fact: by default, all unused memory locations are 0x0000, which happens to represent instruction 
-                    control.addr1mux = Control.ADDR1MUX.pc;
-                    control.addr2mux = Control.ADDR2MUX.ir9;
-                    control.pcmux = Control.PCMUX.addrAdd;
-                    control.PrintMux();
-                    if((control.N && (instruction & 0x0800) > 0) ||
-                        (control.Z && (instruction & 0x0400) > 0) ||
-                        (control.P && (instruction & 0x0200) > 0)) {
+                    processing.addr1mux = Processing.ADDR1MUX.pc;
+                    processing.addr2mux = Processing.ADDR2MUX.ir9;
+                    processing.pcmux = Processing.PCMUX.addrAdd;
+                    processing.PrintMux();
+                    if((processing.N && (instruction & 0x0800) > 0) ||
+                        (processing.Z && (instruction & 0x0400) > 0) ||
+                        (processing.P && (instruction & 0x0200) > 0)) {
                         control.ldPC();
                     }
                     Console.WriteLine("Executed BR");
 					break;
 				case 0b0001:
+                    
 					break;
 			}
 		}
 	}
-    public class Control {
-        //Addr1Mux
-        public enum ADDR1MUX {
-            sr1out,
-            pc
-        }
-        public ADDR1MUX addr1mux;
-        private ushort addr1 => addr1mux == ADDR1MUX.sr1out ? sr1out : pc;
-        //Addr2Mux
-        public enum ADDR2MUX {
-            ir11,
-            ir9,
-            ir6,
-            b0
-        }
-        public ADDR2MUX addr2mux;
-        private short addr2 =>
-            (short) (
-                addr2mux == ADDR2MUX.ir11 ? ((ushort) (ir & 0b111_1111_1111)).ToSigned(11) :
-                addr2mux == ADDR2MUX.ir9 ? ((ushort)(ir & 0b1_1111_1111)).ToSigned(9) :
-                addr2mux == ADDR2MUX.ir6 ? ((ushort)(ir & 0b11_1111)).ToSigned(6) :
-                0);
-        //AddrAdd
-        public ushort addradd => (ushort) (addr1 + addr2);
+    public class Processing {
+        private LC3 lc3;
+
+        private ushort pc => lc3.control.pc;
+        private ushort ir => lc3.control.ir;
+
+        public bool N { get; private set; }
+        public bool Z { get; private set; } = true;
+        public bool P { get; private set; }
+
+        ushort[] registers = new ushort[8];
 
         //PCMux
         public enum PCMUX {
@@ -307,7 +297,7 @@ namespace LC_Sharp {
             inc,
         }
         public PCMUX pcmux;
-        private ushort pcmuxout => (ushort) (
+        public ushort pcmuxout => (ushort)(
             pcmux == PCMUX.bus ? lc3.bus :
             pcmux == PCMUX.addrAdd ? addradd :
             pc + 1);
@@ -321,29 +311,52 @@ namespace LC_Sharp {
             sr1mux == SR1MUX.ir8_6 ? (ir & 0b111000000) :
             (ir & 0b0000111000000000)
             ];
-        private LC3 lc3;
-        public ushort pc { get; private set; }
-        public ushort ir { get; private set; }
-        private ushort[] registers;
-        public bool N { get; private set; }
-        public bool Z { get; private set; }
-        public bool P { get; private set; }
-        public Control(LC3 lc3) {
-            this.lc3 = lc3;
-            pc = 0x3000;
-            ir = 0;
-            Z = true;
-            registers = new ushort[8];
+        public ushort sr2out => registers[ir & 0x0007]; //always last 3 bits
+        public enum DRMUX {
+            ir11_9,
+            b111
         }
-        public void UpdateCC(ushort i) {
-            N = i < 0;
-            Z = i == 0;
-            P = i > 0;
+        public DRMUX drmux;
+        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? (ir & 0b0000111) : 7);
+        public enum ADDR1MUX {
+            sr1out,
+            pc
         }
-        public void ldPC() => pc = pcmuxout;
-        public void gatePC() => lc3.bus = pc;
-        public void ldIR() => ir = lc3.bus;
+        public ADDR1MUX addr1mux;
+        private ushort addr1 => addr1mux == ADDR1MUX.sr1out ? sr1out : pc;
+        public enum ADDR2MUX {
+            ir11,
+            ir9,
+            ir6,
+            b0
+        }
+        public ADDR2MUX addr2mux;
+        private short addr2 =>
+            (short)(
+                addr2mux == ADDR2MUX.ir11 ? ((ushort)(ir & 0b111_1111_1111)).ToSigned(11) :
+                addr2mux == ADDR2MUX.ir9 ? ((ushort)(ir & 0b1_1111_1111)).ToSigned(9) :
+                addr2mux == ADDR2MUX.ir6 ? ((ushort)(ir & 0b11_1111)).ToSigned(6) :
+                0);
+        public ushort addradd => (ushort)(addr1 + addr2);
 
+        public ushort aluA => sr1out;
+        public enum SR2MUX {
+            ir5,
+            sr2out
+        }
+        public SR2MUX sr2mux;
+        public ushort aluB => (ushort)(sr2mux == SR2MUX.ir5 ? (ir & 0x1F) : sr2out);
+
+        public enum ALUK {
+            add, and, not, passthrough
+        }
+        public ALUK aluk;
+        public ushort alu => (ushort)(
+            aluk == ALUK.add ? aluA + aluB :
+            aluk == ALUK.and ? aluA & aluB :
+            aluk == ALUK.not ? ~aluA :
+            aluA
+            );
         public void PrintMux() {
             Console.WriteLine($"Addr1Mux: {addr1mux.ToString()}");
             Console.WriteLine($"Addr1: 0x{addr1.ToString("X")}");
@@ -352,6 +365,28 @@ namespace LC_Sharp {
             Console.WriteLine($"AddrAdd: 0x{addradd.ToString("X")}");
             Console.WriteLine($"PCMux: 0x{pcmuxout.ToString("X")}");
         }
+        public void ldReg() {
+            ushort n = lc3.bus;
+            registers[dr] = n;
+            N = n < 0;
+            Z = n == 0;
+            P = n > 0;
+        }
+    }
+    public class Control {
+
+
+        private LC3 lc3;
+        public ushort pc { get; private set; }
+        public ushort ir { get; private set; }
+        public Control(LC3 lc3) {
+            this.lc3 = lc3;
+            pc = 0x3000;
+            ir = 0;
+        }
+        public void ldPC() => pc = lc3.processing.pcmuxout;
+        public void gatePC() => lc3.bus = pc;
+        public void ldIR() => ir = lc3.bus;
 
         internal void DebugPrint() {
             Console.WriteLine($"PC: 0x{pc.ToString("X")}");
