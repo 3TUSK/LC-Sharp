@@ -8,9 +8,11 @@ namespace LC_Sharp {
 	class Program {
         //Note to self: do not use left shift to remove left bits since operands get converted to ints first
 		public static void Main(string[] args) {
-
             //Console.WriteLine($"0b10000 = {(ushort)0b10000} => {((ushort) (0b10000)).ToSigned(5)}");
             //Console.ReadLine();
+
+            Console.WriteLine(0b0111_1111_1111_1111_1111_1111_1111_1111 << 1);
+            Console.ReadLine();
 
             //Console.WriteLine(((0b0000_111_0_0000_0111 << 99) >> 99).ToString("X"));
             //Console.ReadLine();
@@ -44,11 +46,23 @@ namespace LC_Sharp {
             labels = new Dictionary<string, ushort>();
             labelsReverse = new Dictionary<ushort, string>();
         }
-        public bool Register(string code, ushort result) {
+        public bool Imm5(string code, out ushort result) {
+            if(code.StartsWith("#")) {
+                result = short.Parse(code.Substring(1)).ToUnsigned(5);
+                return true;
+            } else if (code.StartsWith("x")) {
+                result = short.Parse(code, System.Globalization.NumberStyles.HexNumber).ToUnsigned(5);
+                return true;
+            }
+            result = 0;
+            return false;
+        }
+        public bool Register(string code, out ushort result) {
             if(code.Length == 2 && code[0] == 'R' && code[1] >= '0' && code[1] <= '7') {
                 result = 8;
                 return false;
             }
+            result = 0;
             return false;
         }
         public void AssembleToPC(string instruction) {
@@ -91,30 +105,30 @@ namespace LC_Sharp {
          * <exception cref="Exception">Throws an exception if the string names an instruction but is not well-formed.</exception>
          * */
         public ushort? Instruction(ushort pc, string instruction) {
-            var args = instruction.Split(' ');
-            ushort? result = 0;
-            switch (args[0]) {
+            var parts = instruction.Split(' ');
+            ushort result = 0;
+            switch (parts[0]) {
                 case var br when br.StartsWith("BR") && br.Length <= 5:
                     bool n = false, z = false, p = false;
                     foreach(char c in br.Substring(2)) {
                         switch(c) {
                             case 'n':
                                 if(n) {
-                                    throw new Exception($"Line {line}: Repeated condition code 'n' in {instruction}");
+                                    Error($"Repeated condition code 'n'");
                                 } else {
                                     n = true;
                                 }
                                 break;
                             case 'z':
                                 if (z) {
-                                    throw new Exception($"Line {line}: Repeated condition code 'z' in {instruction}");
+                                    Error($"Repeated condition code 'z'");
                                 } else {
                                     z = true;
                                 }
                                 break;
                             case 'p':
                                 if (p) {
-                                    throw new Exception($"Line {line}: Repeated condition code 'p' in {instruction}");
+                                    Error($"Repeated condition code 'p'");
                                 } else {
                                     p = true;
                                 }
@@ -124,28 +138,54 @@ namespace LC_Sharp {
                     result |= (ushort)(n ? 0x0800 : 0);
                     result |= (ushort)(z ? 0x0400 : 0);
                     result |= (ushort)(p ? 0x0200 : 0);
-                    if (args.Length == 2) {
-                        var label = args[1];
-                        if(labels.TryGetValue(label, out ushort destination)) {
-                            Console.WriteLine($"Destination: {destination}");
+                    if(parts.Length != 2) {
+                        Error($"Line {line}: Expected destination label");
+                    }
+                    var label = parts[1];
+                    if(!labels.TryGetValue(label, out ushort destination)) {
+                        Error($"Unknown destination label {label}");
+                    }
 
-                            short offset = (short) (destination - pc);
-                            if(offset < -0b100000000 || offset > 0b011111111) {
-                                throw new Exception($"Line {line}: Destination offset {offset} overflows 9-bit integer in {instruction}");
-                            } else {
-                                result |= (ushort) (offset & 0b111111111);
-                            }
-                        } else {
-                            throw new Exception($"Line {line}: Unknown destination label {label} in {instruction}");
+                    Console.WriteLine($"Destination: {destination}");
+
+                    short offset = (short)(destination - pc);
+                    if (offset < -0b100000000 || offset > 0b011111111) {
+                        Error($"Destination offset {offset} overflows 9-bit integer");
+                    }
+                    result |= (ushort)(offset & 0b111111111);
+                    break;
+                case "ADD":
+                    var args = string.Join("", parts.Skip(1)).Split(',');
+                    if(args.Length != 3) {
+                        Error($"Incorrect number of arguments");
+                    }
+                    if(!Register(args[0], out ushort dr)) {
+                        Error($"Invalid DR {args[0]}");
+                    }
+                    result |= (ushort) (dr << 9);
+
+                    if (!Register(args[1], out ushort sr1)) {
+                        Error($"Invalid SR1 {args[1]}");
+                    }
+                    result |= (ushort)(sr1 << 6);
+
+                    if (!Register(args[2], out ushort sr2)) {
+                        if(!Imm5(args[2], out ushort imm5)) {
+                            Error($"Invalid operand");
                         }
+                        result |= 0b1_00000;
+                        result |= (ushort)imm5;
                     } else {
-                        throw new Exception($"Line {line}: Expected destination label in {instruction}");
+                        result |= (ushort)sr2;
                     }
                     break;
                 default:
                     return null;
             }
             return result;
+            void Error(string message) {
+                throw new Exception($"Line {line}: {message} in {instruction}");
+            }
         }
 
         public string Dissemble(ushort pc, ushort instruction) {
@@ -166,20 +206,29 @@ namespace LC_Sharp {
         }
     }
     //When the MSB is zero, the other bits represent the absolute value
-    //When the MSB is one, the other bits represent the value to subtract from 2^n
+    //When the MSB is one, the other bits represent the value to add to -2^n
     //If the unsigned value is greater than the max signed value (the MSB must be one), that means we subtract the max unsigned value to get the signed value 
     public static class UShort {
-        public static ushort Truncate(this ushort u, int remove) {
-            return (ushort)((u << remove) >> remove);
-        }
+        //Converts ushort to short with equivalent bit pattern
         public static short ToSigned(this ushort unsigned, int n = 16) {
-            ushort maxUnsigned = (ushort) Math.Pow(2, n);
-            ushort maxSigned = (ushort) Math.Pow(2, n - 1);
+            ushort maxUnsigned = (ushort) Math.Pow(2, n);   //0b1111111111111111
+            ushort maxSigned = (ushort) Math.Pow(2, n - 1); //0b0111111111111111
             Console.WriteLine("Max Unsigned: " + maxUnsigned);
             if(unsigned >= maxSigned) {
                 return (short) (unsigned - maxUnsigned);
             } else {
                 return (short) unsigned;
+            }
+        }
+        //Converts short to ushort with equivalent bit pattern
+        public static ushort ToUnsigned(this short signed, int n = 16) {
+            ushort maxUnsigned = (ushort)Math.Pow(2, n); //0b1111111111111111
+            if(signed < 0) {
+                //256 + (-1) = 255, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0001 = 0b1111_1111_1111_1111
+                //256 + (-2) = 255, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0010 = 0b1111_1111_1111_1110
+                return (ushort)(maxUnsigned + signed);
+            } else {
+                return (ushort)signed;
             }
         }
     }
