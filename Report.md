@@ -2,3 +2,8 @@
 LC-Sharp is our project to build a toolset for the Little Computer 3, an Instruction Set Architecture developed for Computer Sciece education. According to our base goals, this toolset will consist of a parser, assembler, and emulator. We have already written high-level plans for the implementation. However, prior to investing our time towards programming, we researched several existing projects with goals similar to ours.
 
 For our research, we used GitHub search since GitHub is where most open-source LC-3 projects are likely to be available. A search for the keyword "lc3" returned several results. A sample of the found projects were written in Verilog or other hardware description language - not very relevant to our software development. Almost all others were written in C or C++. Some of them were incomplete, undocumented, or otherwise not fit for public use. However, we still found a few that were sufficiently developed and comprehensive. We evaluate them below.
+
+# Research
+
+# Our Goals
+We intend to take a unique approach towards implementing the LC-3 emulator. Internally, our project will closely recreate the structure of the LC-3 FSM in code by simulating the use of control signals. That is meant to differentiate the project from others, which focus more on recreating just the visible behavior of the FSM.
