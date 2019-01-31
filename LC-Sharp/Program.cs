@@ -48,10 +48,10 @@ namespace LC_Sharp {
         }
         public bool Imm5(string code, out ushort result) {
             if(code.StartsWith("#")) {
-                result = short.Parse(code.Substring(1)).ToUnsigned(5);
+                result = (ushort) short.Parse(code.Substring(1)).signExtend(5);
                 return true;
             } else if (code.StartsWith("x")) {
-                result = short.Parse(code, System.Globalization.NumberStyles.HexNumber).ToUnsigned(5);
+                result = (ushort) short.Parse(code, System.Globalization.NumberStyles.HexNumber).signExtend(5);
                 return true;
             }
             result = 0;
@@ -194,7 +194,7 @@ namespace LC_Sharp {
                     bool n = (instruction & 0x0800) > 0;
                     bool z = (instruction & 0x0400) > 0;
                     bool p = (instruction & 0x0200) > 0;
-                    short offset9 = ((ushort)(instruction & 0b1_1111_1111)).ToSigned(9);
+                    short offset9 = ((short)(instruction & 0b1_1111_1111)).signExtend(9);
                     
                     return $"BR{(n ? "n" : "")}{(z ? "z" : "")}{(p ? "p" : "")} {(labelsReverse.TryGetValue((ushort)(pc + offset9), out string label) ? label : Convert.ToString(offset9, 10))}";
                 default:
@@ -209,6 +209,25 @@ namespace LC_Sharp {
     //When the MSB is one, the other bits represent the value to add to -2^n
     //If the unsigned value is greater than the max signed value (the MSB must be one), that means we subtract the max unsigned value to get the signed value 
     public static class UShort {
+        public static short signExtend(this short s, int n = 16) {
+            short msbMask = (short) (0b1 << (n - 1));
+            short negativeMask = (short) (0xFFFF << n);
+            if((s & msbMask) != 0) {
+                return (short) (s | negativeMask);
+            } else {
+                return s;
+            }
+        }
+        public static ushort signExtend(this ushort s, int n = 16) {
+            ushort msbMask = (ushort)(1 << (n - 1));
+            ushort negativeMask = (ushort) (0xFF << n);
+            if ((s & msbMask) != 0) {
+                return (ushort)(s | negativeMask);
+            } else {
+                return s;
+            }
+        }
+        /*
         //Functions to be used with ushorts containing smaller-sized numbers
         //Converts ushort to short with equivalent bit pattern
         public static short ToSigned(this ushort unsigned, int n = 16) {
@@ -232,6 +251,7 @@ namespace LC_Sharp {
                 return (ushort)signed;
             }
         }
+        */
     }
 	//LC3 simulator class
 	public class LC3 {
@@ -242,6 +262,7 @@ namespace LC_Sharp {
 		public LC3() {
             control = new Control(this);
             memory = new Memory(this);
+            processing = new Processing(this);
 		}
         public void DebugPrint() {
             control.DebugPrint();
@@ -290,6 +311,10 @@ namespace LC_Sharp {
 
         ushort[] registers = new ushort[8];
 
+        public Processing(LC3 lc3) {
+            this.lc3 = lc3;
+        }
+
         //PCMux
         public enum PCMUX {
             bus,
@@ -301,7 +326,6 @@ namespace LC_Sharp {
             pcmux == PCMUX.bus ? lc3.bus :
             pcmux == PCMUX.addrAdd ? addradd :
             pc + 1);
-        //SR1
         public enum SR1MUX {
             ir8_6,
             ir11_9
@@ -333,12 +357,11 @@ namespace LC_Sharp {
         public ADDR2MUX addr2mux;
         private short addr2 =>
             (short)(
-                addr2mux == ADDR2MUX.ir11 ? ((ushort)(ir & 0b111_1111_1111)).ToSigned(11) :
-                addr2mux == ADDR2MUX.ir9 ? ((ushort)(ir & 0b1_1111_1111)).ToSigned(9) :
-                addr2mux == ADDR2MUX.ir6 ? ((ushort)(ir & 0b11_1111)).ToSigned(6) :
+                addr2mux == ADDR2MUX.ir11 ? ((short)(ir & 0b111_1111_1111)).signExtend(11) :
+                addr2mux == ADDR2MUX.ir9 ? ((short)(ir & 0b1_1111_1111)).signExtend(9) :
+                addr2mux == ADDR2MUX.ir6 ? ((short)(ir & 0b11_1111)).signExtend(6) :
                 0);
         public ushort addradd => (ushort)(addr1 + addr2);
-
         public ushort aluA => sr1out;
         public enum SR2MUX {
             ir5,
