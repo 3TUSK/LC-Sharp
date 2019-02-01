@@ -35,5 +35,17 @@ Overall, `liblc3` provides a fully functional tool set for assembling, running a
 `pylc3` is a Python binding of `liblc3`, which enables the use of Python rather than C++ to interact with `liblc3`. As its name suggests, it is essentially a thin wrapper around the LC-3 state machine from `liblc3` that exposes all public methods to Python program. 
 Currently used by `complx` for its own auto-grader (`pylc3/unittest`) and `comp` (`pylc3/cli`), the command-line interface (CLI) counterpart of graphical `complx`.
 
+## Case Study: `lc3tools`
+
+[`lc3tools`](https://github.com/chiragsakhuja/lc3tools) is another comprehensive LC-3 toolkit developed by students and/or faculties from University of Texas at Austin. According its README, it includes LC-3 assembler, simulator and a grader for academic purpose. Structually, it is split into two part: "backend" (i.e. the LC-3 implementation) and the "frontend" (i.e. user interface, grader, etc.). Unit tests are not discussed because it is not our focus - we are not maintaining other people's project, after all.
+
+### `lc3tools` backend
+
+Similar to `liblc3` used by `complx`, the backend of `lc3tools` is also an LC-3 implemention based on a high-level state machine. All instructions are implemented as direct manipulations to state machine rather than simulation of actual data flows. There is one key differnece - `lc3tools` uses object-oriented design, and it abstracts all instructions as an interface `IInstruction` in which a method `execute` exposes the state machine for manipulation (see also dependency injection). 
+Another key difference is the memory model - in `liblc3` there is a `unsigned short[65536]` in the state machine; while in `lc3tools`, there is a vector of `MemEntry` which essentially wraps a 16-bit integer and its location. The former is more compact but wasteful for most of times; the latter approach can save memory footprint, but is a bit hard to access because one would have to iterate over all entries to get content at a specific memory address.
+Other than that, there are not much differences between `liblc3` and `lc3tools` backend; both of them have tokenizers and use two-passes strategy for assembling source files.
+
+### `lc3tools` frontend
+
 # Our Goals
 We intend to take a unique approach towards implementing the LC-3 emulator. Internally, our project will closely recreate the structure of the LC-3 FSM in code by simulating the use of control signals. That is meant to differentiate the project from others, which focus more on recreating just the visible behavior of the FSM.
