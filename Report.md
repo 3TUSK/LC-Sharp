@@ -5,7 +5,7 @@ For our research, we used GitHub search since GitHub is where most open-source L
 
 # Research
 
-It should not be a surprise that there has been several LC-3 toolkits available online as free and/or open-source software. As such, we may conclude some useful tips on how our project are structured and programmed.
+It should not be a surprise that there has been several LC-3 toolkits available online as free and/or open-source software. As such, we may conclude some useful tips on how our project should be structured and programmed.
 
 ## Case Study: `complx`
 
