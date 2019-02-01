@@ -24,7 +24,7 @@ Overall, `liblc3` provides a fully functional tool set for assembling, running a
 
 ### `complx`
 
-`complx` is the LC-3 simulator in the complx LC-3 toolkit with a graphical user interface. It is built on top of `liblc3`, and it uses exWidgets for the GUI part.
+`complx` is the LC-3 simulator in the complx LC-3 toolkit with a graphical user interface. It is built on top of `liblc3`, and it uses wxWidgets for the GUI part.
 
 ### `lc3edit`
 
