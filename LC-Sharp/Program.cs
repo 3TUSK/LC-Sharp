@@ -18,16 +18,19 @@ namespace LC_Sharp {
             //Console.ReadLine();
             var c = new LC3();
             var a = new Assembler(c);
-            a.Label(0x2FF0, "TEST");
-            a.AssembleToPC("BRnzp TEST");
-            a.DissembleToPC();
+            //a.Label(0x2FF0, "TEST");
+            //a.AssembleToPC("BRnzp TEST");
+            //a.DissembleToPC();
             //c.memory.WriteToMemory(0x3000, 0b0000_010_0_0000_0111);
+            a.AssembleToPC("ADD R0, R0, #10");
             c.Fetch();
-            c.DebugPrint();
+            //c.DebugPrint();
             //Console.WriteLine($"Assembled: {a.DissembleIR()}");
 
             c.Execute();
             c.DebugPrint();
+
+
             Console.ReadLine();
 		}
 	}
@@ -85,7 +88,7 @@ namespace LC_Sharp {
                 var label = parts[0];
                 Label(lc3.control.pc, label);
                 if(parts.Length >= 2) {
-                    Pseudo(string.Join(" ", parts.Skip(1)));
+                    Directive(string.Join(" ", parts.Skip(1)));
                 }
             }
         }
@@ -94,7 +97,7 @@ namespace LC_Sharp {
             labels[label] = location;
             labelsReverse[location] = label;
         }
-        public void Pseudo(string line) {
+        public void Directive(string line) {
             throw new NotImplementedException();
         }
         /**
@@ -187,7 +190,107 @@ namespace LC_Sharp {
                 throw new Exception($"Line {line}: {message} in {instruction}");
             }
         }
+        private enum Operands {
+            Reg,                //Size 3
+            FlagRegImm5,        //Size 6
+            LabelOffset9,       //Size 9
+            LabelOffset6        //Size 6
+        }
+        private ushort Assemble(ushort pc, string instruction, params Operands[] operands) {
+            ushort bitIndex = 15;
+            ushort result = 0;
+            Dictionary<string, ushort> instructions = new Dictionary<string, ushort> {
+                {"BR", 0 },
+                { "ADD", 1 },
+                { "LD", 2 },
+                { "ST", 3 },
+                { "JSR", 4 },
+                { "JSRR", 4 },
+                { "AND", 5 },
+                { "LDR", 6 },
+                { "STR", 7 },
+                { "RTI", 8 },
+                { "NOT", 9 },
+                { "LDI", 10 },
+                { "STI", 11 },
+                { "JMP", 12 },
+                { "RET", 12 },
+                { "RESERVED", 13 },
+                { "LEA", 14 },
+                { "TRAP", 15 }
+            };
+            string[] args = instruction.Split();
+            result |= (ushort) (instructions[args[0]] << bitIndex);
+            args = string.Join("", args.Skip(1)).Split(',');
+            bitIndex -= 3;
+            int index = 0;
+            foreach(Operands operand in operands) {
+                switch(operand) {
+                    case Operands.Reg: {
+                            if (!Register(args[index], out ushort reg)) {
+                                Error($"Register expected: {args[index]} in");
+                            }
+                            result |= (ushort)(reg << bitIndex);
+                            bitIndex -= 3;
+                            break;
+                        }
+                    case Operands.FlagRegImm5: {
+                            if (!Register(args[index], out ushort reg)) {
+                                result |= (ushort)(1 << bitIndex);
+                                if(!Imm5(args[index], out ushort imm5)) {
+                                    Error($"Imm5 value expected: {args[index]}");
+                                } else {
+                                    result |= (ushort)(1 << bitIndex);
+                                    bitIndex--;
+                                    result |= (ushort)(imm5 << bitIndex);
+                                    bitIndex -= 5;
+                                }
+                            } else {
+                                result |= (ushort)(reg << bitIndex);
+                                bitIndex -= 3;
+                            }
+                            break;
+                        }
+                    case Operands.LabelOffset9: {
+                            result |= (ushort) (Offset(args[index], 9) << bitIndex);
+                            bitIndex -= 9;
+                            break;
+                        }
+                    case Operands.LabelOffset6: {
+                            result |= (ushort)(Offset(args[index], 6) << bitIndex);
+                            bitIndex -= 6;
+                            break;
+                        }
+                }
+                index++;
+            }
+            return result;
+            void Error(string s) {
+                throw new Exception($"Line {line}: {s}");
+            }
+            //Calculates the PC-offset from the given label and verifies that it fits within a given size
+            short Offset(string label, int size) {
+                short mask = (short)(0xFFFF >> (16 - size));    //All ones
+                short min = (short)(1 << (size - 1));           //Highest negative number, same as the MSB
+                //short max = (short)(0xEFFF >> (16 - size));
+                short max = (short)(mask ^ min);                //Highest positive number, All ones except MSB
 
+                if (labels.TryGetValue(label, out ushort destination)) {
+                    short offset = (short)(destination - pc);
+                    //Size range check
+                    if (offset < min || offset > max) {
+                        Error($"Offset at {label} overflows signed {size}-bit integer in {instruction}");
+                    } else {
+                        //Truncate the result to the given size
+                        return (short) (offset & mask);
+                    }
+                } else {
+                    //Otherwise, we don't accept this label
+                    Error($"Unknown label {label} in {instruction}");
+                }
+                return 0;
+            }
+        }
         public string Dissemble(ushort pc, ushort instruction) {
             switch (instruction >> 12) {
                 case 0b0000:
