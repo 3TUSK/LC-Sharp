@@ -57,6 +57,7 @@ The frontend `lc3tools` contains a graphical user interface and a command-line i
    - For two, one of our choice is to simulate the real data flow and control signals, which object-oriented design actually fits better (each component can be modeled as object, and thus data flows are interactions between objects).
  - Two-pass assembling seems to be our first choice.
  - We have to find a balance point between "alloacting 65536 addresses from the beginning of the time" and "alloacting new addresses when requested and query it by iterating over all allocated addresses".
+ - We may also want a modular project like `complx` so that one can reuse a portion of our project instead of depending on the whole thing.
 
 # Our Goals
 We intend to take a unique approach towards implementing the LC-3 emulator. Internally, our project will closely recreate the structure of the LC-3 FSM in code by simulating the use of control signals. That is meant to differentiate the project from others, which focus more on recreating just the visible behavior of the FSM.
