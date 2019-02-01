@@ -23,6 +23,7 @@ namespace LC_Sharp {
             //a.DissembleToPC();
             //c.memory.WriteToMemory(0x3000, 0b0000_010_0_0000_0111);
             a.AssembleToPC("ADD R0, R0, #10");
+            //0b0001_000_000_1_01010
             c.Fetch();
             //c.DebugPrint();
             //Console.WriteLine($"Assembled: {a.DissembleIR()}");
@@ -49,6 +50,7 @@ namespace LC_Sharp {
             labels = new Dictionary<string, ushort>();
             labelsReverse = new Dictionary<ushort, string>();
         }
+        private void Print(string message) => Console.WriteLine(message);
         public bool Imm5(string code, out ushort result) {
             if(code.StartsWith("#")) {
                 result = (ushort) short.Parse(code.Substring(1)).signExtend(5);
@@ -62,8 +64,8 @@ namespace LC_Sharp {
         }
         public bool Register(string code, out ushort result) {
             if(code.Length == 2 && code[0] == 'R' && code[1] >= '0' && code[1] <= '7') {
-                result = 8;
-                return false;
+                result = (ushort)(code[1] - '0');
+                return true;
             }
             result = 0;
             return false;
@@ -108,10 +110,9 @@ namespace LC_Sharp {
          * <exception cref="Exception">Throws an exception if the string names an instruction but is not well-formed.</exception>
          * */
         public ushort? Instruction(ushort pc, string instruction) {
-            var parts = instruction.Split(' ');
             ushort result = 0;
-            switch (parts[0]) {
-                case var br when br.StartsWith("BR") && br.Length <= 5:
+            switch (instruction.Split(' ')[0]) {
+                case var br when br.StartsWith("BR"):
                     bool n = false, z = false, p = false;
                     foreach(char c in br.Substring(2)) {
                         switch(c) {
@@ -141,46 +142,12 @@ namespace LC_Sharp {
                     result |= (ushort)(n ? 0x0800 : 0);
                     result |= (ushort)(z ? 0x0400 : 0);
                     result |= (ushort)(p ? 0x0200 : 0);
-                    if(parts.Length != 2) {
-                        Error($"Line {line}: Expected destination label");
-                    }
-                    var label = parts[1];
-                    if(!labels.TryGetValue(label, out ushort destination)) {
-                        Error($"Unknown destination label {label}");
-                    }
-
-                    Console.WriteLine($"Destination: {destination}");
-
-                    short offset = (short)(destination - pc);
-                    if (offset < -0b100000000 || offset > 0b011111111) {
-                        Error($"Destination offset {offset} overflows 9-bit integer");
-                    }
-                    result |= (ushort)(offset & 0b111111111);
+                    result |= Assemble(pc, "BR" + instruction.Substring(br.Length), new [] { Operands.Ignore3, Operands.LabelOffset9 });
+                    Print("Assembled BR");
                     break;
                 case "ADD":
-                    var args = string.Join("", parts.Skip(1)).Split(',');
-                    if(args.Length != 3) {
-                        Error($"Incorrect number of arguments");
-                    }
-                    if(!Register(args[0], out ushort dr)) {
-                        Error($"Invalid DR {args[0]}");
-                    }
-                    result |= (ushort) (dr << 9);
-
-                    if (!Register(args[1], out ushort sr1)) {
-                        Error($"Invalid SR1 {args[1]}");
-                    }
-                    result |= (ushort)(sr1 << 6);
-
-                    if (!Register(args[2], out ushort sr2)) {
-                        if(!Imm5(args[2], out ushort imm5)) {
-                            Error($"Invalid operand");
-                        }
-                        result |= 0b1_00000;
-                        result |= imm5;
-                    } else {
-                        result |= sr2;
-                    }
+                    result = Assemble(pc, instruction, new [] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 });
+                    Print("Assembled ADD");
                     break;
                 default:
                     return null;
@@ -192,15 +159,16 @@ namespace LC_Sharp {
         }
         private enum Operands {
             Reg,                //Size 3
+            Ignore3,
             FlagRegImm5,        //Size 6
             LabelOffset9,       //Size 9
             LabelOffset6        //Size 6
         }
         private ushort Assemble(ushort pc, string instruction, params Operands[] operands) {
-            ushort bitIndex = 15;
+            ushort bitIndex = 12;
             ushort result = 0;
             Dictionary<string, ushort> instructions = new Dictionary<string, ushort> {
-                {"BR", 0 },
+                { "BR", 0 },
                 { "ADD", 1 },
                 { "LD", 2 },
                 { "ST", 3 },
@@ -222,47 +190,64 @@ namespace LC_Sharp {
             string[] args = instruction.Split();
             result |= (ushort) (instructions[args[0]] << bitIndex);
             args = string.Join("", args.Skip(1)).Split(',');
-            bitIndex -= 3;
             int index = 0;
             foreach(Operands operand in operands) {
                 switch(operand) {
+                    case Operands.Ignore3:
+                        bitIndex -= 3;
+                        break;
                     case Operands.Reg: {
-                            if (!Register(args[index], out ushort reg)) {
-                                Error($"Register expected: {args[index]} in");
+                            if (index >= args.Length) {
+                                Error($"Missing register in {instruction}");
                             }
-                            result |= (ushort)(reg << bitIndex);
+
+                            if (!Register(args[index], out ushort reg)) {
+                                Error($"Register expected: '{args[index]}' in {instruction}");
+                            }
                             bitIndex -= 3;
+                            result |= (ushort)(reg << bitIndex);
+                            index++;
                             break;
                         }
                     case Operands.FlagRegImm5: {
+                            if (index >= args.Length) {
+                                Error($"Missing operand in {instruction}");
+                            }
                             if (!Register(args[index], out ushort reg)) {
-                                result |= (ushort)(1 << bitIndex);
                                 if(!Imm5(args[index], out ushort imm5)) {
                                     Error($"Imm5 value expected: {args[index]}");
                                 } else {
-                                    result |= (ushort)(1 << bitIndex);
                                     bitIndex--;
-                                    result |= (ushort)(imm5 << bitIndex);
+                                    result |= (ushort)(1 << bitIndex);
                                     bitIndex -= 5;
+                                    result |= (ushort)(imm5 << bitIndex);
                                 }
                             } else {
-                                result |= (ushort)(reg << bitIndex);
                                 bitIndex -= 3;
+                                result |= (ushort)(reg << bitIndex);
                             }
+                            index++;
                             break;
                         }
                     case Operands.LabelOffset9: {
-                            result |= (ushort) (Offset(args[index], 9) << bitIndex);
+                            if (index >= args.Length) {
+                                Error($"Insufficient label in {instruction}");
+                            }
                             bitIndex -= 9;
+                            result |= (ushort) (Offset(args[index], 9) << bitIndex);
+                            index++;
                             break;
                         }
                     case Operands.LabelOffset6: {
-                            result |= (ushort)(Offset(args[index], 6) << bitIndex);
+                            if (index >= args.Length) {
+                                Error($"Missing label in {instruction}");
+                            }
                             bitIndex -= 6;
+                            result |= (ushort)(Offset(args[index], 6) << bitIndex);
+                            index++;
                             break;
                         }
                 }
-                index++;
             }
             return result;
             void Error(string s) {
@@ -279,14 +264,14 @@ namespace LC_Sharp {
                     short offset = (short)(destination - pc);
                     //Size range check
                     if (offset < min || offset > max) {
-                        Error($"Offset at {label} overflows signed {size}-bit integer in {instruction}");
+                        Error($"Offset at '{label}' overflows signed {size}-bit integer in {instruction}");
                     } else {
                         //Truncate the result to the given size
                         return (short) (offset & mask);
                     }
                 } else {
                     //Otherwise, we don't accept this label
-                    Error($"Unknown label {label} in {instruction}");
+                    Error($"Unknown label '{label}' in {instruction}");
                 }
                 return 0;
             }
@@ -368,6 +353,7 @@ namespace LC_Sharp {
             processing = new Processing(this);
 		}
         public void DebugPrint() {
+            processing.DebugPrint();
             control.DebugPrint();
         }
         public void Fetch() {
@@ -397,14 +383,37 @@ namespace LC_Sharp {
                     Console.WriteLine("Executed BR");
 					break;
 				case 0b0001:
-                    
-					break;
+                    //Register mode
+                    if ((instruction & 0b100000) == 0) {
+                        processing.sr1mux = Processing.SR1MUX.ir8_6;
+                        processing.sr2mux = Processing.SR2MUX.sr2out;
+                        processing.aluk = Processing.ALUK.add;
+                        Console.WriteLine($"ALUA: {processing.aluA}");
+                        Console.WriteLine($"ALUB: {processing.aluB}");
+                        Console.WriteLine($"ALU: {processing.alu}");
+                        processing.gateALU();
+                        processing.drmux = Processing.DRMUX.ir11_9;
+                        processing.ldReg();
+                        Console.WriteLine("Executed ADD Register");
+                    } else {
+                        //Immediate mode
+                        processing.sr1mux = Processing.SR1MUX.ir8_6;
+                        processing.sr2mux = Processing.SR2MUX.ir5;
+                        processing.aluk = Processing.ALUK.add;
+                        Console.WriteLine($"ALUA: {processing.aluA}");
+                        Console.WriteLine($"ALUB: {processing.aluB}");
+                        Console.WriteLine($"ALU: {processing.alu}");
+                        processing.gateALU();
+                        processing.drmux = Processing.DRMUX.ir11_9;
+                        processing.ldReg();
+                        Console.WriteLine("Executed ADD Immediate");
+                    }
+                    break;
 			}
 		}
 	}
     public class Processing {
         private LC3 lc3;
-
         private ushort pc => lc3.control.pc;
         private ushort ir => lc3.control.ir;
 
@@ -417,8 +426,6 @@ namespace LC_Sharp {
         public Processing(LC3 lc3) {
             this.lc3 = lc3;
         }
-
-        //PCMux
         public enum PCMUX {
             bus,
             addrAdd,
@@ -433,18 +440,18 @@ namespace LC_Sharp {
             ir8_6,
             ir11_9
         }
+        public ushort sr1 => (ushort) (
+            sr1mux == SR1MUX.ir8_6 ? ((ir & 0b111000000) >> 6) :
+            ((ir & 0b0000111000000000) >> 9));
         public SR1MUX sr1mux;
-        public ushort sr1out => registers[
-            sr1mux == SR1MUX.ir8_6 ? (ir & 0b111000000) :
-            (ir & 0b0000111000000000)
-            ];
+        public ushort sr1out => registers[sr1];
         public ushort sr2out => registers[ir & 0x0007]; //always last 3 bits
         public enum DRMUX {
             ir11_9,
             b111
         }
         public DRMUX drmux;
-        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? (ir & 0b0000111) : 7);
+        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? ((ir & 0x0E00) >> 8) : 7);
         public enum ADDR1MUX {
             sr1out,
             pc
@@ -471,8 +478,9 @@ namespace LC_Sharp {
             sr2out
         }
         public SR2MUX sr2mux;
-        public ushort aluB => (ushort)(sr2mux == SR2MUX.ir5 ? (ir & 0x1F) : sr2out);
-
+        public ushort aluB => (ushort)(
+            sr2mux == SR2MUX.ir5 ? ((ushort)(ir & 0x1F)).signExtend(5) :
+            sr2out);
         public enum ALUK {
             add, and, not, passthrough
         }
@@ -498,10 +506,23 @@ namespace LC_Sharp {
             Z = n == 0;
             P = n > 0;
         }
+        public void gateALU() => lc3.bus = alu;
+
+        public void DebugPrint() {
+            Console.WriteLine($"R0: {registers[0]}");
+            Console.WriteLine($"R1: {registers[1]}");
+            Console.WriteLine($"R2: {registers[2]}");
+            Console.WriteLine($"R3: {registers[3]}");
+            Console.WriteLine($"R4: {registers[4]}");
+            Console.WriteLine($"R5: {registers[5]}");
+            Console.WriteLine($"R6: {registers[6]}");
+            Console.WriteLine($"R7: {registers[7]}");
+            Console.WriteLine($"N: {N}");
+            Console.WriteLine($"Z: {Z}");
+            Console.WriteLine($"P: {P}");
+        }
     }
     public class Control {
-
-
         private LC3 lc3;
         public ushort pc { get; private set; }
         public ushort ir { get; private set; }
@@ -540,15 +561,9 @@ namespace LC_Sharp {
 				mdr = mem[mar] = 0;
 			}
 		}
-		public void memEnW() {
-			mem[mar] = mdr;
-		}
-        public void WriteToMemory(ushort mar, ushort mdr) {
-            mem[mar] = mdr;
-        }
-        public ushort Read(ushort mar) {
-            return mem[mar];
-        }
+		public void memEnW() => mem[mar] = mdr;
+        public void WriteToMemory(ushort mar, ushort mdr) => mem[mar] = mdr;
+        public ushort Read(ushort mar) => mem[mar];
 	}
     
 }
