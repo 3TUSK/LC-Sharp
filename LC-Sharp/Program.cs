@@ -45,6 +45,7 @@ namespace LC_Sharp {
         public Dictionary<ushort, string> labelsReverse { get; private set; } //reverse lookup labels
         LC3 lc3;
         ushort line;
+        //ushort address;       //To do: stop using the attached lc3 pc and use our own pointer
         public Assembler(LC3 lc3) {
             this.lc3 = lc3;
             labels = new Dictionary<string, ushort>();
@@ -72,7 +73,11 @@ namespace LC_Sharp {
         }
         public void AssembleToPC(string instruction) {
             line = 1;
-            lc3.memory.WriteToMemory(lc3.control.pc, (ushort)Instruction(lc3.control.pc, instruction));
+            if(Instruction(lc3.control.pc, instruction, out ushort u)) {
+                lc3.memory.WriteToMemory(lc3.control.pc, u);
+            } else {
+                throw new Exception($"Invalid instruction {instruction}");
+            }
         }
         public string DissembleToPC() {
             return Dissemble((ushort)lc3.control.pc, lc3.memory.Read(lc3.control.pc));
@@ -83,41 +88,106 @@ namespace LC_Sharp {
 
 
         public void Line(string line) {
-            if(Instruction(lc3.control.pc, line) is ushort u) {
-                lc3.memory.WriteToMemory((ushort) (lc3.control.pc - 1), u);
+            bool labeled = false;
+            Parse:
+            if (Instruction(lc3.control.pc, line, out ushort u)) {
+                //If this names an instruction, we treat it like one
+                lc3.memory.WriteToMemory((ushort)(lc3.control.pc - 1), u);
+            } else if (line.StartsWith(".")) {
+                //Period marks a directive
+                Directive(line);
             } else {
-                var parts = line.Split(' ');
-                var label = parts[0];
-                Label(lc3.control.pc, label);
-                if(parts.Length >= 2) {
-                    Directive(string.Join(" ", parts.Skip(1)));
+                if(labeled) {
+                    //To do: what to do if we have two labels in a row?
                 }
+                //This line starts with a label, but we can have a directive or op right after
+                var label = line.Split(new[] { ' ' }, 1)[0];
+                Label(lc3.control.pc, label);
+                labeled = true;
+                line = line.Substring(label.Length).TrimStart();
+                goto Parse;
             }
         }
+        //Create a label at the current location
         public void Label(ushort pc, string label) {
             ushort location = (ushort)(pc - 1); //pc is 1 ahead of this location
             labels[label] = location;
             labelsReverse[location] = label;
         }
         public void Directive(string line) {
-            throw new NotImplementedException();
+            switch(line.Split(new[] { ' ' }, 1)[0]) {
+                case ".FILL":
+
+                    break;
+            }
+
+            short Fill(string code) {
+                if(code.StartsWith("b")) {
+                    short result = 0;
+                    foreach(char digit in code.Skip(1)) {
+                        if(digit == '1') {
+                            result++;
+                        } else if(digit != '0') {
+                            Error($"Invalid binary digit {code}");
+                        }
+                        result <<= 1;
+                    }
+                    return result;
+                } else if (code.StartsWith("#")) {
+                    return short.Parse(code.Substring(1));
+                } else if (code.StartsWith("X")) {
+                    return short.Parse(code, System.Globalization.NumberStyles.HexNumber);
+                } else if (code.StartsWith("'")) {
+                    if (code.Length == 3) {
+                        return (short) code[1];
+                    } else {
+                        Error($"Invalid character literal {code}");
+                    }
+                }
+                return 0;
+            }
+            void Error(string message) {
+                throw new Exception($"Line {line}: {message} in {line}");
+            }
         }
+
+        //We use this to lookup predefined operands for a given operation
+        private static readonly Dictionary<string, Operands[]> operandTable = new Dictionary<string, Operands[]> {
+            {"BR", new [] { Operands.b000, Operands.LabelOffset9 } },
+            {"ADD", new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 } },
+            { "LD", new[] { Operands.Reg, Operands.LabelOffset9 } },
+            { "ST", new[] { Operands.Reg, Operands.LabelOffset9 } },
+            { "JSR", new[] { Operands.b1, Operands.LabelOffset11 } },
+            { "JSRR", new[] { Operands.b000, Operands.Reg } },
+            { "AND", new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 } },
+            { "LDR", new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 } },
+            { "STR", new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 } },
+            { "NOT", new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1} },
+            { "LDI", new[] { Operands.Reg, Operands.LabelOffset9 } },
+            { "STI", new[] { Operands.Reg, Operands.LabelOffset9 } },
+            { "JMP", new[] { Operands.b000, Operands.Reg } },
+            { "RET", new Operands[0] },
+            { "LEA", new[] { Operands.Reg, Operands.LabelOffset9 } },
+        };
         /**
          * <summary>Attempts to assemble a single instruction string into ushort format.</summary>
          * <param name="pc">The expected value of the PC when this instruction should be executed</param>
          * <param name="instruction">The instruction string to assemble</param>
-         * <returns>If <paramref name="instruction"/> names an instruction and is well-formed, then returns the assembled form. If <paramref name="instruction"/> does not name an instruction, returns null</returns>
+         * <returns>If <paramref name="instruction"/> names an instruction and is well-formed, then returns the assembled form. If <paramref name="instruction"/> does not name an instruction, returns false</returns>
          * <exception cref="Exception">Throws an exception if the string names an instruction but is not well-formed.</exception>
          * */
-        public ushort? Instruction(ushort pc, string instruction) {
-            ushort result = 0;
-            switch (instruction.Split(' ')[0]) {
+        public bool Instruction(ushort pc, string instruction, out ushort result) {
+            result = 0;
+            string op = instruction.Split(new[] { ' ' }, 2)[0];
+            Print($"Op: {op}");
+            switch (op) {
                 case var br when br.StartsWith("BR"):
+                    //BRnzp has complicated syntax so we evaluate it here
                     bool n = false, z = false, p = false;
-                    foreach(char c in br.Substring(2)) {
-                        switch(c) {
+                    foreach (char c in br.Substring(2)) {
+                        switch (c) {
                             case 'n':
-                                if(n) {
+                                if (n) {
                                     Error($"Repeated condition code 'n'");
                                 } else {
                                     n = true;
@@ -142,27 +212,36 @@ namespace LC_Sharp {
                     result |= (ushort)(n ? 0x0800 : 0);
                     result |= (ushort)(z ? 0x0400 : 0);
                     result |= (ushort)(p ? 0x0200 : 0);
-                    result |= Assemble(pc, "BR" + instruction.Substring(br.Length), new [] { Operands.Ignore3, Operands.LabelOffset9 });
-                    Print("Assembled BR");
+                    result |= Assemble(pc, "BR" + instruction.Substring(br.Length), operandTable["BR"]);
                     break;
-                case "ADD":
-                    result = Assemble(pc, instruction, new [] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 });
-                    Print("Assembled ADD");
+                case var entry when operandTable.TryGetValue(entry, out Operands[] operands):
+                    //Otherwise if we already predefined the operands for this operation
+                    result = Assemble(pc, instruction, operands);
+                    break;
+                case "RTI":
+                    Error("RTI not implemented");
+                    break;
+                case "TRAP":
+
                     break;
                 default:
-                    return null;
+                    Print($"Unknown instruction {op}");
+                    return false;
             }
-            return result;
+            Print($"Assembled {op}");
+            return true;
             void Error(string message) {
                 throw new Exception($"Line {line}: {message} in {instruction}");
             }
         }
         private enum Operands {
-            Reg,                //Size 3
-            Ignore3,
-            FlagRegImm5,        //Size 6
-            LabelOffset9,       //Size 9
-            LabelOffset6        //Size 6
+            Reg,                //Size 3, a register
+            b1,                 //Size 1, a binary digit one
+            b000,               //Size 3, three binary digits zero
+            FlagRegImm5,        //Size 6, a register or an immediate value
+            LabelOffset6,       //Size 6, an 6-bit offset from a pc to a label
+            LabelOffset9,       //Size 9, an 9-bit offset from a pc to a label
+            LabelOffset11,      //Size 11, an 11-bit offset from a pc to a label
         }
         private ushort Assemble(ushort pc, string instruction, params Operands[] operands) {
             ushort bitIndex = 12;
@@ -193,7 +272,11 @@ namespace LC_Sharp {
             int index = 0;
             foreach(Operands operand in operands) {
                 switch(operand) {
-                    case Operands.Ignore3:
+                    case Operands.b1:
+                        bitIndex--;
+                        result &= (ushort) (1 << bitIndex);
+                        break;
+                    case Operands.b000:
                         bitIndex -= 3;
                         break;
                     case Operands.Reg: {
@@ -244,6 +327,15 @@ namespace LC_Sharp {
                             }
                             bitIndex -= 6;
                             result |= (ushort)(Offset(args[index], 6) << bitIndex);
+                            index++;
+                            break;
+                        }
+                    case Operands.LabelOffset11: {
+                            if (index >= args.Length) {
+                                Error($"Missing label in {instruction}");
+                            }
+                            bitIndex -= 11;
+                            result |= (ushort)(Offset(args[index], 11) << bitIndex);
                             index++;
                             break;
                         }
@@ -409,13 +501,39 @@ namespace LC_Sharp {
                         Console.WriteLine("Executed ADD Immediate");
                     }
                     break;
+                case 0b0010:
+                    processing.addr1mux = Processing.ADDR1MUX.pc;
+                    processing.addr2mux = Processing.ADDR2MUX.ir9;
+                    processing.marmux = Processing.MARMUX.addradd;
+                    processing.gateMARMUX();
+                    memory.ldMAR();
+                    memory.memEnR();
+                    memory.gateMDR();
+                    processing.drmux = Processing.DRMUX.ir11_9;
+                    processing.ldReg();
+                    break;
+                case 0b0011:
+
+                    break;
 			}
+
 		}
 	}
     public class Processing {
         private LC3 lc3;
         private ushort pc => lc3.control.pc;
         private ushort ir => lc3.control.ir;
+
+        public enum MARMUX {
+            addradd,
+            ir8
+        }
+        public MARMUX marmux;
+        public ushort marmuxout => (ushort)(
+            marmux == MARMUX.addradd ? lc3.processing.addradd :
+            lc3.bus
+            );
+        public void gateMARMUX() => lc3.bus = marmuxout;
 
         public bool N { get; private set; }
         public bool Z { get; private set; } = true;
@@ -548,7 +666,6 @@ namespace LC_Sharp {
 			this.lc3 = lc3;
 			mem = new Dictionary<ushort, ushort>();
 		}
-		//Control signal methods
 		public void ldMAR() => mar = lc3.bus;
 		public void ldMDR() => mdr = lc3.bus;
 		public void gateMAR() => lc3.bus = mar;
