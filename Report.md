@@ -41,11 +41,22 @@ Currently used by `complx` for its own auto-grader (`pylc3/unittest`) and `comp`
 
 ### `lc3tools` backend
 
-Similar to `liblc3` used by `complx`, the backend of `lc3tools` is also an LC-3 implemention based on a high-level state machine. All instructions are implemented as direct manipulations to state machine rather than simulation of actual data flows. There is one key differnece - `lc3tools` uses object-oriented design, and it abstracts all instructions as an interface `IInstruction` in which a method `execute` exposes the state machine for manipulation (see also dependency injection). 
-Another key difference is the memory model - in `liblc3` there is a `unsigned short[65536]` in the state machine; while in `lc3tools`, there is a vector of `MemEntry` which essentially wraps a 16-bit integer and its location. The former is more compact but wasteful for most of times; the latter approach can save memory footprint, but is a bit hard to access because one would have to iterate over all entries to get content at a specific memory address.
-Other than that, there are not much differences between `liblc3` and `lc3tools` backend; both of them have tokenizers and use two-passes strategy for assembling source files.
+Similar to `liblc3` used by `complx`, the backend of `lc3tools` is also an LC-3 implemention based on a high-level state machine. All instructions are implemented as direct manipulations to state machine rather than simulation of actual data flows. There is one key differnece - `lc3tools` uses object-oriented design, and it abstracts all instructions as an interface `IInstruction` in which a method `execute` exposes the state machine for manipulation (see also dependency injection).  
+Another key difference is the memory model - in `liblc3` there is a `unsigned short[65536]` in the state machine; while in `lc3tools`, there is a vector of `MemEntry` which essentially wraps a 16-bit integer and its location. The former is more compact but wasteful for most of times; the latter approach can save memory footprint, but is a bit hard to access because one would have to iterate over all entries to get content at a specific memory address.  
+Other than that, there are not much differences between `liblc3` and `lc3tools` backend; both of them have tokenizers and use two-passes strategy for assembling source files.  
 
 ### `lc3tools` frontend
+
+The frontend `lc3tools` contains a graphical user interface and a command-line interface for simulator, as well as a grader. Both grader and CLI are straightforward; the GUI part uses Vue.js and Electron framework.
+
+## Conclusion
+
+ - We may want to avoid re-inventing the wheel because both `liblc3` and `lc3tools` are on high-level to a certain extent.
+ - We may want to consider a more object-oriented approach.
+   - For one, the assembler and runner can break down to smaller, unit-test-friendly pieces, which should also bring additional flexibilities, for example defining the instruction `1101` or defining new pseudo-instructions.
+   - For two, one of our choice is to simulate the real data flow and control signals, which object-oriented design actually fits better (each component can be modeled as object, and thus data flows are interactions between objects).
+ - Two-pass assembling seems to be our first choice.
+ - We have to find a balance point between "alloacting 65536 addresses from the beginning of the time" and "alloacting new addresses when requested and query it by iterating over all allocated addresses".
 
 # Our Goals
 We intend to take a unique approach towards implementing the LC-3 emulator. Internally, our project will closely recreate the structure of the LC-3 FSM in code by simulating the use of control signals. That is meant to differentiate the project from others, which focus more on recreating just the visible behavior of the FSM.
