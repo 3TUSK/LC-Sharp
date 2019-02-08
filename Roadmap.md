@@ -5,4 +5,5 @@
 - [ ] GUI Implementation
 
 <sup>A</sup> Assigned to Alex Chen
+
 <sup>Y</sup> Assigned to Yourui Xue
