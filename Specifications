@@ -1,0 +1,14 @@
+# Specifications
+- `LC3`: The main module representing the LC3 FSM.
+  - `control`: An instance of the Control module
+  - `memory`: An instance of the Memory module
+  - `processing`: An instance of the Processing module
+  - `Fetch()`: Loads the current instruction into IR and increments the PC.
+  - `Execute()`: Executes the instruction code stored in IR by setting the control signals in `control`, `memory`, and `processing`.
+- `Control`: Contains the PC and IR
+  - `lc3`: A reference to the parent.
+  - `pc`: A `ushort` representing the PC value.
+  - `ir`: A `ushort` representing the IR value.
+  - `ldPC()`: Sets the `pc` from `pcmuxout` in the parent's `processing`
+  - `ldIR()`: Sets the `ir` from the parent's `bus`
+  - `gatePC()`: Sets the parent's `bus` to the PC
