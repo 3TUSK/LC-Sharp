@@ -32,11 +32,8 @@ namespace LC_Sharp {
         }
         public void Init() {
             Application.Init();
-            
-            {
-                var top = Application.Top;
-                top.Add(win);
-            }
+            var top = Application.Top;
+            top.Add(window);
 
             Application.Run();
         }

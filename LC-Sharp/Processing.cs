@@ -51,7 +51,7 @@ namespace LC_Sharp {
             b111
         }
         public DRMUX drmux;
-        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? ((ir & 0x0E00) >> 8) : 7);
+        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? ((ir & 0b0000111000000000) >> 9) : 7);
         public enum ADDR1MUX {
             sr1out,
             pc
