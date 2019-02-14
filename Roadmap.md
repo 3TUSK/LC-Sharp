@@ -1,9 +1,11 @@
 # Roadmap
-- [ ] Assembler Implementation
+- [ ] Assembler Implementation<sup>Y</sup>
 - [X] LC3 Implementation<sup>A</sup>
 - [ ] GUI Design
-- [ ] GUI Implementation
+- [ ] GUI Implementation<sup>A</sup>
+- [ ] TRAP Subroutine Implementation
+- [ ] TRAP/GUI integration
 
-<sup>A</sup> Assigned to Alex Chen
+<sup>A</sup> Alex Chen
 
-<sup>Y</sup> Assigned to Yourui Xue
+<sup>Y</sup> Yourui Xue
