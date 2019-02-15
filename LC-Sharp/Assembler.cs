@@ -6,59 +6,59 @@ using LC_Sharp.AssemblerImpl;
 
 namespace LC_Sharp
 {
-    public class AssemblerController
+    public static class AssemblerController
     {
-        private static readonly Dictionary<string, IInstructionAssembler> _assemblers = new Dictionary<string, IInstructionAssembler>();
+        private static readonly Dictionary<string, IInstructionAssembler> Assemblers = new Dictionary<string, IInstructionAssembler>();
 
         static AssemblerController()
         {
-            _assemblers["ADD"] = new AddInstruction();
-            _assemblers["AND"] = new AndInstruction();
+            Assemblers["ADD"] = new AddInstruction();
+            Assemblers["AND"] = new AndInstruction();
             
-            _assemblers["BR"] = new BranchInstruction("BR", true, true, true); // Alias of BRNZP
-            _assemblers["BRN"] = new BranchInstruction("BRN", true, false, false);
-            _assemblers["BRZ"] = new BranchInstruction("BRZ", false, true, false);
-            _assemblers["BRP"] = new BranchInstruction("BRP", false, false, true);
-            _assemblers["BRZP"] = new BranchInstruction("BRZP", false, true, true);
-            _assemblers["BRNP"] = new BranchInstruction("BRNP", true, false, true);
-            _assemblers["BRNZ"] = new BranchInstruction("BRNZ", true, true, false);
-            _assemblers["BRNZP"] = new BranchInstruction("BRNZP", true, true, true);
+            Assemblers["BR"] = new BranchInstruction("BR", true, true, true); // Alias of BRNZP
+            Assemblers["BRN"] = new BranchInstruction("BRN", true, false, false);
+            Assemblers["BRZ"] = new BranchInstruction("BRZ", false, true, false);
+            Assemblers["BRP"] = new BranchInstruction("BRP", false, false, true);
+            Assemblers["BRZP"] = new BranchInstruction("BRZP", false, true, true);
+            Assemblers["BRNP"] = new BranchInstruction("BRNP", true, false, true);
+            Assemblers["BRNZ"] = new BranchInstruction("BRNZ", true, true, false);
+            Assemblers["BRNZP"] = new BranchInstruction("BRNZP", true, true, true);
             
-            _assemblers["JMP"] = new RegisterBasedPCAccessInstruction("JMP", 0b1100);
-            _assemblers["JSR"] = new JSRInstruction();
-            _assemblers["JSRR"] = new RegisterBasedPCAccessInstruction("JSRR", 0b0100);
-            _assemblers["LD"] = new LabelBasedMemoryAccessInstruction("LD", 0b0010);
-            _assemblers["LDI"] = new LabelBasedMemoryAccessInstruction("LDI", 0b1010);
-            _assemblers["LDR"] = new OffsetBasedMemoryAccessInstruction("LDR", 0b0110);
-            _assemblers["LEA"] = new LabelBasedMemoryAccessInstruction("LEA", 0b1110);
-            _assemblers["NOT"] = new NotInstruction();
-            _assemblers["RET"] = new ZeroArgumentsInstruction("RET", 0xC1C0); // 1100 000 111 000000, i.e. JMP R7
-            _assemblers["RTI"] = new ZeroArgumentsInstruction("RTI", 0x8000); // 1000 000000000000
-            _assemblers["ST"] = new LabelBasedMemoryAccessInstruction("ST", 0b0011);
-            _assemblers["STI"] = new LabelBasedMemoryAccessInstruction("STI", 0b1011);
-            _assemblers["STR"] = new OffsetBasedMemoryAccessInstruction("STR", 0b0111);
-            _assemblers["TRAP"] = new TrapInstruction();
+            Assemblers["JMP"] = new RegisterBasedPCAccessInstruction("JMP", 0b1100);
+            Assemblers["JSR"] = new JSRInstruction();
+            Assemblers["JSRR"] = new RegisterBasedPCAccessInstruction("JSRR", 0b0100);
+            Assemblers["LD"] = new LabelBasedMemoryAccessInstruction("LD", 0b0010);
+            Assemblers["LDI"] = new LabelBasedMemoryAccessInstruction("LDI", 0b1010);
+            Assemblers["LDR"] = new OffsetBasedMemoryAccessInstruction("LDR", 0b0110);
+            Assemblers["LEA"] = new LabelBasedMemoryAccessInstruction("LEA", 0b1110);
+            Assemblers["NOT"] = new NotInstruction();
+            Assemblers["RET"] = new ZeroArgumentsInstruction("RET", 0xC1C0); // 1100 000 111 000000, i.e. JMP R7
+            Assemblers["RTI"] = new ZeroArgumentsInstruction("RTI", 0x8000); // 1000 000000000000
+            Assemblers["ST"] = new LabelBasedMemoryAccessInstruction("ST", 0b0011);
+            Assemblers["STI"] = new LabelBasedMemoryAccessInstruction("STI", 0b1011);
+            Assemblers["STR"] = new OffsetBasedMemoryAccessInstruction("STR", 0b0111);
+            Assemblers["TRAP"] = new TrapInstruction();
             
-            _assemblers["GETC"] = new ZeroArgumentsInstruction("GETC", 0xF020); // TRAP x20
-            _assemblers["OUT"] = new ZeroArgumentsInstruction("OUT", 0xF021); // TRAP x21
-            _assemblers["PUTS"] = new ZeroArgumentsInstruction("PUTS", 0xF022); // TRAP x22
-            _assemblers["IN"] = new ZeroArgumentsInstruction("IN", 0xF023); // TRAP x23
-            _assemblers["PUTSP"] = new ZeroArgumentsInstruction("PUTSP", 0xF024); // TRAP x24
-            _assemblers["HALT"] = new ZeroArgumentsInstruction("HALT", 0xF025); // TRAP x25
+            Assemblers["GETC"] = new ZeroArgumentsInstruction("GETC", 0xF020); // TRAP x20
+            Assemblers["OUT"] = new ZeroArgumentsInstruction("OUT", 0xF021); // TRAP x21
+            Assemblers["PUTS"] = new ZeroArgumentsInstruction("PUTS", 0xF022); // TRAP x22
+            Assemblers["IN"] = new ZeroArgumentsInstruction("IN", 0xF023); // TRAP x23
+            Assemblers["PUTSP"] = new ZeroArgumentsInstruction("PUTSP", 0xF024); // TRAP x24
+            Assemblers["HALT"] = new ZeroArgumentsInstruction("HALT", 0xF025); // TRAP x25
         }
 
-        public static ICollection<string> GetKnownInstructions() => _assemblers.Keys;
+        public static ICollection<string> GetKnownInstructions() => Assemblers.Keys;
         
-        public static void registerNewInstruction(string instr, IInstructionAssembler assembler)
+        public static void RegisterNewInstruction(string instr, IInstructionAssembler assembler)
         {
-            if (_assemblers.ContainsKey(instr))
+            if (Assemblers.ContainsKey(instr))
             {
                 throw new Exception("Cannot overwrite existed instruction");
             }
-            _assemblers[instr] = assembler;
+            Assemblers[instr] = assembler;
         }
 
-        public static IInstructionAssembler find(string instName) => _assemblers[instName];
+        public static IInstructionAssembler Find(string instName) => Assemblers[instName];
     }
     
     public class NeoAssembler
@@ -72,7 +72,7 @@ namespace LC_Sharp
             var assembleResult = new Dictionary<ushort, ushort>();
             foreach (var instr in _parsedFile.Instructions)
             {
-                var singleInstructionAssembler = AssemblerController.find(instr.Value.GetInstruction().Split(' ').First());
+                var singleInstructionAssembler = AssemblerController.Find(instr.Value.GetInstruction().Split(' ').First());
                 if (singleInstructionAssembler != null)
                 {
                     assembleResult[instr.Key] = singleInstructionAssembler.Assemble(instr.Value.GetInstruction(), instr.Key, _parsedFile);
@@ -207,7 +207,7 @@ namespace LC_Sharp
 
         public abstract class ArithematicInstruction : IInstructionAssembler
         {
-            protected readonly string _instr;
+            private readonly string _instr;
             private readonly ushort _argCount;
 
             protected ArithematicInstruction(string instr, ushort argCount)
@@ -258,7 +258,7 @@ namespace LC_Sharp
                     isImm5 = true;
                     op2 = (ushort) (0 + (imm5 < 0 ? 0x10 : 0x00) + (imm5 & 0x000F));
                 }
-                catch (AssemblerException e)
+                catch (AssemblerException ignored)
                 {
                     op2 = AssemblerUtil.ExpectRegister(tokens[3]);
                 }
@@ -284,7 +284,7 @@ namespace LC_Sharp
                     isImm5 = true;
                     op2 = (ushort) (0 + (imm5 < 0 ? 0x10 : 0x00) + (imm5 & 0x000F));
                 }
-                catch (AssemblerException e)
+                catch (AssemblerException ignored)
                 {
                     op2 = AssemblerUtil.ExpectRegister(tokens[3]);
                 }
