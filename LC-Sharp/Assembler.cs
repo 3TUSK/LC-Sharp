@@ -24,9 +24,9 @@ namespace LC_Sharp
             _assemblers["BRNZ"] = new BranchInstruction("BRNZ", true, true, false);
             _assemblers["BRNZP"] = new BranchInstruction("BRNZP", true, true, true);
             
-            _assemblers["JMP"] = null;
-            _assemblers["JSR"] = null;
-            _assemblers["JSRR"] = null;
+            _assemblers["JMP"] = new RegisterBasedPCAccessInstruction("JMP", 0b1100);
+            _assemblers["JSR"] = new JSRInstruction();
+            _assemblers["JSRR"] = new RegisterBasedPCAccessInstruction("JSRR", 0b0100);
             _assemblers["LD"] = new LabelBasedMemoryAccessInstruction("LD", 0b0010);
             _assemblers["LDI"] = new LabelBasedMemoryAccessInstruction("LDI", 0b1010);
             _assemblers["LDR"] = new OffsetBasedMemoryAccessInstruction("LDR", 0b0110);
@@ -204,7 +204,7 @@ namespace LC_Sharp
             
             public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
             {
-                var tokens = sourceInstruction.Split(' ', ',');
+                var tokens = sourceInstruction.Split(' ', ',').Where(s => s.Length > 0).ToArray();
                 if (tokens.Length != _argCount)
                 {
                     throw new AssemblerException(sourceInstruction, "Operands mismatch");
@@ -309,14 +309,68 @@ namespace LC_Sharp
             }
         }
 
-        public sealed class BranchInstruction : IInstructionAssembler
+        public abstract class PCAccessInstruction : IInstructionAssembler
         {
             private readonly string _instr;
-            private readonly ushort _controlFlag = 0x0000;
 
-            public BranchInstruction(string instr, bool n, bool z, bool p)
+            protected PCAccessInstruction(string instr) => _instr = instr;
+            
+            public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
             {
-                _instr = instr;
+                var tokens = sourceInstruction.Split(' ');
+                if (tokens[0] != _instr)
+                {
+                    throw new AssemblerException(sourceInstruction, "Instruction mismatch");
+                }
+
+                return ContinueAssemble(offset, environment, tokens);
+            }
+
+            protected abstract ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens);
+
+            public string Disassemble(ushort instruction)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public abstract class LabelBasedPCAccessInstruction : PCAccessInstruction
+        {
+            private readonly ushort _offsetLimit;
+
+            protected LabelBasedPCAccessInstruction(string instr, ushort offset) : base(instr) => _offsetLimit = offset;
+
+            protected sealed override ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens)
+            {
+                var labelTarget = AssemblerUtil.expectLabel(tokens[1], env.LabelTable);
+                if ((offset + 1 - labelTarget) >> _offsetLimit > 0)
+                {
+                    throw new AssemblerException(tokens[1], "Unreachable label");
+                }
+
+                return FinalAssemble(labelTarget);
+            }
+
+            protected abstract ushort FinalAssemble(ushort labelOffset);
+        }
+
+        public sealed class RegisterBasedPCAccessInstruction : PCAccessInstruction
+        {
+            private readonly ushort _opcode;
+            
+            public RegisterBasedPCAccessInstruction(string instr, ushort opcode) : base(instr) => _opcode = opcode;
+
+            protected override ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens)
+                => (ushort) ((_opcode << 12) | (AssemblerUtil.expectRegister(tokens[2]) << 6) & 0b1111_000_111_000000);
+            }
+        }
+
+        public sealed class BranchInstruction : LabelBasedPCAccessInstruction
+        {
+            private readonly ushort _controlFlag;
+
+            public BranchInstruction(string instr, bool n, bool z, bool p) : base(instr, 9)
+            {
                 if (n)
                 {
                     _controlFlag |= 0x0800;
@@ -330,25 +384,19 @@ namespace LC_Sharp
                     _controlFlag |= 0x0200;
                 }
             }
-            
-            public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
+
+            protected override ushort FinalAssemble(ushort labelOffset)
+                => (ushort) (_controlFlag | labelOffset & 0x0FFF); // BR has opcode of 0000, so we use 0x0FFF to normalize it
+        }
+
+        public sealed class JSRInstruction : LabelBasedPCAccessInstruction
+        {
+            public JSRInstruction() : base("JSR", 11)
             {
-                var tokens = sourceInstruction.Split(' ');
-                if (tokens.Length != 2)
-                {
-                    throw new AssemblerException(sourceInstruction, "Wrong number of tokens");
-                }
-                if (tokens[0] != _instr)
-                {
-                    throw new AssemblerException(sourceInstruction, "Instruction mismatch");
-                }
-                return (ushort) (_controlFlag | AssemblerUtil.expectLabel(tokens[1], environment.LabelTable));
             }
 
-            public string Disassemble(ushort instruction)
-            {
-                throw new NotImplementedException();
-            }
+            protected override ushort FinalAssemble(ushort labelOffset) 
+                => (ushort) (0b0100_1000_0000_0000 | (labelOffset & 0b0000_0_11111111111));
         }
 
         public abstract class MemoryAccessInstruction : IInstructionAssembler
