@@ -13,7 +13,16 @@ namespace LC_Sharp
         {
             _assemblers["ADD"] = new AddInstruction();
             _assemblers["AND"] = new AndInstruction();
-            _assemblers["BR"] = null; // TODO (3TUSK): flatten all legal permutations?
+            
+            _assemblers["BR"] = new BranchInstruction("BR", true, true, true);
+            _assemblers["BRN"] = new BranchInstruction("BRN", true, false, false);
+            _assemblers["BRZ"] = new BranchInstruction("BRZ", false, true, false);
+            _assemblers["BRP"] = new BranchInstruction("BRP", false, false, true);
+            _assemblers["BRZP"] = new BranchInstruction("BR", false, true, true);
+            _assemblers["BRNP"] = new BranchInstruction("BR", true, false, true);
+            _assemblers["BRNZ"] = new BranchInstruction("BR", true, true, false);
+            _assemblers["BRNZP"] = new BranchInstruction("BR", true, true, true);
+            
             _assemblers["JMP"] = null;
             _assemblers["JSR"] = null;
             _assemblers["JSRR"] = null;
@@ -296,6 +305,48 @@ namespace LC_Sharp
                 }
 
                 return (ushort) (AssemblerUtil.expectTrapVec8(tokens[1]) | 0xF000); // 1111 0000 TRAPVEC8
+            }
+
+            public string Disassemble(ushort instruction)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public sealed class BranchInstruction : IInstructionAssembler
+        {
+            private readonly string _instr;
+            private readonly ushort _controlFlag = 0x0000;
+
+            public BranchInstruction(string instr, bool n, bool z, bool p)
+            {
+                _instr = instr;
+                if (n)
+                {
+                    _controlFlag |= 0x0800;
+                }
+                if (z)
+                {
+                    _controlFlag |= 0x0400;
+                }
+                if (p)
+                {
+                    _controlFlag |= 0x0200;
+                }
+            }
+            
+            public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
+            {
+                var tokens = sourceInstruction.Split(' ');
+                if (tokens.Length != 2)
+                {
+                    throw new AssemblerException(sourceInstruction, "Wrong number of tokens");
+                }
+                if (tokens[0] != _instr)
+                {
+                    throw new AssemblerException(sourceInstruction, "Instruction mismatch");
+                }
+                return (ushort) (_controlFlag | AssemblerUtil.expectLabel(tokens[1], environment.LabelTable));
             }
 
             public string Disassemble(ushort instruction)
