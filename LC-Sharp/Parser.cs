@@ -34,10 +34,7 @@ namespace LC_Sharp
         private bool isFinished; // Used by .END pseudo-instruction
         private string currentComment = "";
 
-        public void BeginLine()
-        {
-            sourceLine++;
-        }
+        public void BeginLine() => sourceLine++;
         
         public void Accept(string token)
         {
@@ -90,10 +87,7 @@ namespace LC_Sharp
             isInstruction = false;
         }
 
-        public void Terminate()
-        {
-            isFinished = true;
-        }
+        public void Terminate() => isFinished = true;
 
         public void SetPosition(ushort newOffset)
         {
@@ -104,23 +98,15 @@ namespace LC_Sharp
             position = newOffset;
         }
 
-        public ushort GetPosition()
-        {
-            return position;
-        }
-        
-        public bool isTerminated()
-        {
-            return isFinished;
-        }
+        public ushort GetPosition() => position;
+
+        public bool isTerminated() => isFinished;
 
         public ParsedFile Assemble()
         {
-            Dictionary<ushort, InstructionEntry> instructions =
-                this.instructions.ToDictionary(i => i.GetAddress(), i => i);
-            Dictionary<ushort, List<string>> reversedLabelLookup =
-                this.instructions.ToDictionary(i => i.GetAddress(), i => i.GetLabels());
-            Dictionary<string, ushort> labelLookup = new Dictionary<string, ushort>();
+            var instructions = this.instructions.ToDictionary(i => i.GetAddress(), i => i);
+            var reversedLabelLookup = this.instructions.ToDictionary(i => i.GetAddress(), i => i.GetLabels());
+            var labelLookup = new Dictionary<string, ushort>();
             foreach (var entry in reversedLabelLookup)
             {
                 foreach (var label in entry.Value)
@@ -145,9 +131,7 @@ namespace LC_Sharp
     public class WrappedAssemblerInstruction : IAssemblerInstruction
     {
         public static WrappedAssemblerInstruction of(Action<ParserController, string[]> action)
-        {
-            return new WrappedAssemblerInstruction(action);
-        }
+            => new WrappedAssemblerInstruction(action);
         
         private readonly Action<ParserController, string[]> _impl;
 
@@ -156,10 +140,7 @@ namespace LC_Sharp
             _impl = action;
         }
         
-        public void Process(ParserController controller, params string[] arguments)
-        {
-            _impl(controller, arguments);
-        }
+        public void Process(ParserController controller, params string[] arguments) => _impl(controller, arguments);
     }
     
     public class Parser
@@ -220,20 +201,11 @@ namespace LC_Sharp
             this.sourceLineNumber = sourceLineNumber;
         }
 
-        public ushort GetAddress()
-        {
-            return address;
-        }
+        public ushort GetAddress() => address;
         
-        public string GetPrimaryLabel()
-        {
-            return labels[labels.Count - 1];
-        }
+        public string GetPrimaryLabel() => labels[labels.Count - 1];
 
-        public List<string> GetLabels()
-        {
-            return labels;
-        }
+        public List<string> GetLabels() => labels;
     }
 
     public class ParsedFile

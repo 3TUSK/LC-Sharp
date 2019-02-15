@@ -37,10 +37,8 @@ namespace LC_Sharp
             _assemblers["HALT"] = new ZeroArgumentsInstruction("HALT", 0xF025); // TRAP x25
         }
 
-        public static ICollection<string> GetKnownInstructions()
-        {
-            return _assemblers.Keys;
-        }
+        public static ICollection<string> GetKnownInstructions() => _assemblers.Keys;
+        
         public static void registerNewInstruction(string instr, IInstructionAssembler assembler)
         {
             if (_assemblers.ContainsKey(instr))
@@ -84,10 +82,8 @@ namespace LC_Sharp
             _instrInQuestion = instr;
         }
 
-        public string GetMalformedInstruction()
-        {
-            return _instrInQuestion;
-        }
+        public string GetMalformedInstruction() => _instrInQuestion;
+        
     }
     
     namespace AssemblerImpl
@@ -286,9 +282,7 @@ namespace LC_Sharp
             }
 
             protected override ushort ContinueAssemble(ushort offset, ParsedFile env, ushort destReg, ushort op1, string[] tokens)
-            {
-                return (ushort) (0x9000 + (destReg << 9) + (op1 << 6) + 0x003F); // 1001 DR SR 1 11111
-            }
+                => (ushort) (0x9000 + (destReg << 9) + (op1 << 6) + 0x003F); // 1001 DR SR 1 11111
         }
 
         public sealed class TrapInstruction : IInstructionAssembler
