@@ -376,7 +376,6 @@ namespace LC_Sharp
 
             protected override ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens)
                 => (ushort) ((_opcode << 12) | (AssemblerUtil.ExpectRegister(tokens[2]) << 6) & 0b1111_000_111_000000);
-            }
         }
 
         public sealed class BranchInstruction : LabelBasedPCAccessInstruction
