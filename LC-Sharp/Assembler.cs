@@ -57,18 +57,32 @@ namespace LC_Sharp
             }
             _assemblers[instr] = assembler;
         }
+
+        public static IInstructionAssembler find(string instName) => _assemblers[instName];
     }
     
     public class NeoAssembler
     {
-        private ParsedFile _parsedFile;
+        private readonly ParsedFile _parsedFile;
 
         public NeoAssembler(ParsedFile parsedFile) => _parsedFile = parsedFile;
 
         public Dictionary<ushort, ushort> Assemble()
         {
-            // TODO Assemble
-            return new Dictionary<ushort, ushort>();
+            var assembleResult = new Dictionary<ushort, ushort>();
+            foreach (var instr in _parsedFile.Instructions)
+            {
+                var singleInstructionAssembler = AssemblerController.find(instr.Value.GetInstruction().Split(' ').First());
+                if (singleInstructionAssembler != null)
+                {
+                    assembleResult[instr.Key] = singleInstructionAssembler.Assemble(instr.Value.GetInstruction(), instr.Key, _parsedFile);
+                }
+                else
+                {
+                    throw new Exception($"Don't know how to assemble {instr.Value.GetInstruction()}");
+                }
+            }
+            return assembleResult;
         }
     }
 
@@ -95,7 +109,7 @@ namespace LC_Sharp
     {
         public static class AssemblerUtil
         {
-            public static ushort expectRegister(string token)
+            public static ushort ExpectRegister(string token)
             {
                 if (token.Length != 2 || token[0] != 'R')
                 {
@@ -115,7 +129,7 @@ namespace LC_Sharp
                 }
             }
 
-            public static ushort expectLabel(string label, IDictionary<string, ushort> symbolTable)
+            public static ushort ExpectLabel(string label, IDictionary<string, ushort> symbolTable)
             {
                 if (symbolTable.ContainsKey(label)) // TODO (3TUSK): Should we add label name max. length restriction?
                 {
@@ -138,7 +152,7 @@ namespace LC_Sharp
                 throw new Exception($"Immediate value overflow: {token}");
             }
 
-            public static ushort expectTrapVec8(string token)
+            public static ushort ExpectTrapVec8(string token)
             {
                 if (token.Length <= 1 || token[0] != 'X')
                 {
@@ -215,8 +229,8 @@ namespace LC_Sharp
                     throw new AssemblerException(sourceInstruction, "Instruction mismatch");
                 }
 
-                var destination = AssemblerUtil.expectRegister(tokens[1]);
-                var operand1 = AssemblerUtil.expectRegister(tokens[2]);
+                var destination = AssemblerUtil.ExpectRegister(tokens[1]);
+                var operand1 = AssemblerUtil.ExpectRegister(tokens[2]);
                 return ContinueAssemble(offset, environment, destination, operand1, tokens);
             }
 
@@ -246,7 +260,7 @@ namespace LC_Sharp
                 }
                 catch (AssemblerException e)
                 {
-                    op2 = AssemblerUtil.expectRegister(tokens[3]);
+                    op2 = AssemblerUtil.ExpectRegister(tokens[3]);
                 }
                 // 0001 DR SR 0 00 SR2 If 2nd operand is register
                 // 0001 DR SR 1 Imm5 If 2nd operand is immediate value
@@ -272,7 +286,7 @@ namespace LC_Sharp
                 }
                 catch (AssemblerException e)
                 {
-                    op2 = AssemblerUtil.expectRegister(tokens[3]);
+                    op2 = AssemblerUtil.ExpectRegister(tokens[3]);
                 }
                 // 0101 DR SR 0 00 SR2 If 2nd operand is register
                 // 0101 DR SR 1 Imm5 If 2nd operand is immediate value
@@ -300,7 +314,7 @@ namespace LC_Sharp
                     throw new AssemblerException("Malformed TRAP instruction!");
                 }
 
-                return (ushort) (AssemblerUtil.expectTrapVec8(tokens[1]) | 0xF000); // 1111 0000 TRAPVEC8
+                return (ushort) (AssemblerUtil.ExpectTrapVec8(tokens[1]) | 0xF000); // 1111 0000 TRAPVEC8
             }
 
             public string Disassemble(ushort instruction)
@@ -342,7 +356,7 @@ namespace LC_Sharp
 
             protected sealed override ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens)
             {
-                var labelTarget = AssemblerUtil.expectLabel(tokens[1], env.LabelTable);
+                var labelTarget = AssemblerUtil.ExpectLabel(tokens[1], env.LabelTable);
                 if ((offset + 1 - labelTarget) >> _offsetLimit > 0)
                 {
                     throw new AssemblerException(tokens[1], "Unreachable label");
@@ -361,7 +375,7 @@ namespace LC_Sharp
             public RegisterBasedPCAccessInstruction(string instr, ushort opcode) : base(instr) => _opcode = opcode;
 
             protected override ushort ContinueAssemble(ushort offset, ParsedFile env, string[] tokens)
-                => (ushort) ((_opcode << 12) | (AssemblerUtil.expectRegister(tokens[2]) << 6) & 0b1111_000_111_000000);
+                => (ushort) ((_opcode << 12) | (AssemblerUtil.ExpectRegister(tokens[2]) << 6) & 0b1111_000_111_000000);
             }
         }
 
@@ -418,7 +432,7 @@ namespace LC_Sharp
                     throw new AssemblerException(sourceInstruction, "Instruction mismatch");
                 }
 
-                var reg1 = AssemblerUtil.expectRegister(tokens[1]);
+                var reg1 = AssemblerUtil.ExpectRegister(tokens[1]);
                 return ContinueAssemble(offset, environment, reg1, tokens);
             }
 
@@ -438,7 +452,7 @@ namespace LC_Sharp
 
             protected override ushort ContinueAssemble(ushort offset, ParsedFile env, ushort reg1, string[] tokens)
             {
-                var labelTarget = AssemblerUtil.expectLabel(tokens[2], env.LabelTable);
+                var labelTarget = AssemblerUtil.ExpectLabel(tokens[2], env.LabelTable);
                 var offset9 = offset + 1 - labelTarget;
                 if (offset9 > 511)
                 {
@@ -456,7 +470,7 @@ namespace LC_Sharp
 
             protected override ushort ContinueAssemble(ushort offset, ParsedFile env, ushort reg1, string[] tokens)
             {
-                var reg2 = AssemblerUtil.expectRegister(tokens[2]);
+                var reg2 = AssemblerUtil.ExpectRegister(tokens[2]);
                 var offset6 = AssemblerUtil.ExpectImm(tokens[3], 6);
                 return (ushort) ((_opcode << 12) | (reg1 << 9) | (reg2 << 6) | (offset6 & 0x003F));
             }

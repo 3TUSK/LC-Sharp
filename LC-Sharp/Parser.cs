@@ -206,6 +206,8 @@ namespace LC_Sharp
         public string GetPrimaryLabel() => labels[labels.Count - 1];
 
         public List<string> GetLabels() => labels;
+
+        public string GetInstruction() => sourceInst;
     }
 
     public class ParsedFile
