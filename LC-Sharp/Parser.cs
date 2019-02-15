@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -8,29 +9,18 @@ namespace LC_Sharp
 {
     public class ParserController
     {
-        // TODO This actually needs a proper registry
-        private static readonly HashSet<string> instr = new HashSet<string>
+        private static readonly Dictionary<string, IAssemblerInstruction> _pseudoOps = new Dictionary<string, IAssemblerInstruction>();
+
+        static ParserController()
         {
-            "ADD",
-            "AND",
-            "BR", // Split into 8 variants?
-            "JMP",
-            "JSR", "JSRR",
-            "LD", "LDI", "LDR",
-            "LEA",
-            "NOT",
-            "RET",
-            "RTI",
-            "ST", "STI", "STR",
-            "TRAP",
-                
-            "GETC",   // TRAP x20
-            "OUT",    // TRAP x21
-            "PUTS",   // TRAP x22
-            "IN",     // TRAP x23
-            "PUTSP",  // TRAP x24
-            "HALT"    // TRAP x25
-        };
+            _pseudoOps["ORIG"] = WrappedAssemblerInstruction.of((controller, args) => controller.SetPosition(0x3000)); // TODO
+            _pseudoOps["FILL"] = WrappedAssemblerInstruction.of((controller, args) => {}); // TODO
+            _pseudoOps["BLKW"] = WrappedAssemblerInstruction.of((controller, args) => {}); // TODO
+            _pseudoOps["STRINGZ"] = WrappedAssemblerInstruction.of((controller, args) => {}); // TODO
+            _pseudoOps["END"] = WrappedAssemblerInstruction.of((controller, args) => controller.Terminate());
+        }
+        
+        private static readonly ICollection<string> instr = AssemblerController.GetKnownInstructions();
 
         private uint sourceLine; // Record this for debug purpose
         private ushort position; // Used for calculating memory offset, used by .ORIGIN pseudo-instruction
@@ -105,6 +95,20 @@ namespace LC_Sharp
             isFinished = true;
         }
 
+        public void SetPosition(ushort newOffset)
+        {
+            if (newOffset < position)
+            {
+                throw new ParserException("Origin cannot overlap - most likely you put too much instructions or data.");
+            }
+            position = newOffset;
+        }
+
+        public ushort GetPosition()
+        {
+            return position;
+        }
+        
         public bool isTerminated()
         {
             return isFinished;
@@ -125,6 +129,36 @@ namespace LC_Sharp
                 }
             }
             return new ParsedFile(instructions, labelLookup, reversedLabelLookup);
+        }
+    }
+
+    public class ParserException : Exception
+    {
+        public ParserException(string message) : base(message) {}
+    }
+
+    public interface IAssemblerInstruction
+    {
+        void Process(ParserController controller, params string[] arguments);
+    }
+
+    public class WrappedAssemblerInstruction : IAssemblerInstruction
+    {
+        public static WrappedAssemblerInstruction of(Action<ParserController, string[]> action)
+        {
+            return new WrappedAssemblerInstruction(action);
+        }
+        
+        private readonly Action<ParserController, string[]> _impl;
+
+        public WrappedAssemblerInstruction(Action<ParserController, string[]> action)
+        {
+            _impl = action;
+        }
+        
+        public void Process(ParserController controller, params string[] arguments)
+        {
+            _impl(controller, arguments);
         }
     }
     
