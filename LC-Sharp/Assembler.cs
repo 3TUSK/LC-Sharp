@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using LC_Sharp.AssemblerImpl;
 
 namespace LC_Sharp
@@ -14,28 +15,28 @@ namespace LC_Sharp
             _assemblers["ADD"] = new AddInstruction();
             _assemblers["AND"] = new AndInstruction();
             
-            _assemblers["BR"] = new BranchInstruction("BR", true, true, true);
+            _assemblers["BR"] = new BranchInstruction("BR", true, true, true); // Alias of BRNZP
             _assemblers["BRN"] = new BranchInstruction("BRN", true, false, false);
             _assemblers["BRZ"] = new BranchInstruction("BRZ", false, true, false);
             _assemblers["BRP"] = new BranchInstruction("BRP", false, false, true);
-            _assemblers["BRZP"] = new BranchInstruction("BR", false, true, true);
-            _assemblers["BRNP"] = new BranchInstruction("BR", true, false, true);
-            _assemblers["BRNZ"] = new BranchInstruction("BR", true, true, false);
-            _assemblers["BRNZP"] = new BranchInstruction("BR", true, true, true);
+            _assemblers["BRZP"] = new BranchInstruction("BRZP", false, true, true);
+            _assemblers["BRNP"] = new BranchInstruction("BRNP", true, false, true);
+            _assemblers["BRNZ"] = new BranchInstruction("BRNZ", true, true, false);
+            _assemblers["BRNZP"] = new BranchInstruction("BRNZP", true, true, true);
             
             _assemblers["JMP"] = null;
             _assemblers["JSR"] = null;
             _assemblers["JSRR"] = null;
-            _assemblers["LD"] = null;
-            _assemblers["LDI"] = null;
-            _assemblers["LDR"] = null;
-            _assemblers["LEA"] = null;
+            _assemblers["LD"] = new LabelBasedMemoryAccessInstruction("LD", 0b0010);
+            _assemblers["LDI"] = new LabelBasedMemoryAccessInstruction("LDI", 0b1010);
+            _assemblers["LDR"] = new OffsetBasedMemoryAccessInstruction("LDR", 0b0110);
+            _assemblers["LEA"] = new LabelBasedMemoryAccessInstruction("LEA", 0b1110);
             _assemblers["NOT"] = new NotInstruction();
             _assemblers["RET"] = new ZeroArgumentsInstruction("RET", 0xC1C0); // 1100 000 111 000000, i.e. JMP R7
             _assemblers["RTI"] = new ZeroArgumentsInstruction("RTI", 0x8000); // 1000 000000000000
-            _assemblers["ST"] = null;
-            _assemblers["STI"] = null;
-            _assemblers["STR"] = null;
+            _assemblers["ST"] = new LabelBasedMemoryAccessInstruction("ST", 0b0011);
+            _assemblers["STI"] = new LabelBasedMemoryAccessInstruction("STI", 0b1011);
+            _assemblers["STR"] = new OffsetBasedMemoryAccessInstruction("STR", 0b0111);
             _assemblers["TRAP"] = new TrapInstruction();
             
             _assemblers["GETC"] = new ZeroArgumentsInstruction("GETC", 0xF020); // TRAP x20
@@ -62,10 +63,7 @@ namespace LC_Sharp
     {
         private ParsedFile _parsedFile;
 
-        public NeoAssembler(ParsedFile parsedFile)
-        {
-            _parsedFile = parsedFile;
-        }
+        public NeoAssembler(ParsedFile parsedFile) => _parsedFile = parsedFile;
 
         public Dictionary<ushort, ushort> Assemble()
         {
@@ -86,10 +84,8 @@ namespace LC_Sharp
     {
         private readonly string _instrInQuestion;
 
-        public AssemblerException(string instr, string reason = "Unknown Assembler Error") : base(reason)
-        {
-            _instrInQuestion = instr;
-        }
+        public AssemblerException(string instr, string reason = "Unknown Assembler Error") : base(reason) 
+            =>_instrInQuestion = instr;
 
         public string GetMalformedInstruction() => _instrInQuestion;
         
@@ -128,14 +124,14 @@ namespace LC_Sharp
                 throw new Exception($"Not a valid label: {label}");
             }
 
-            public static short expectImm5(string token)
+            public static short ExpectImm(string token, ushort len)
             {
                 if (token.Length <= 1 || token[0] != '#')
                 {
                     throw new Exception($"Not a valid immediate value: {token}");
                 }
                 var parsed = short.Parse(token.Substring(1));
-                if (parsed >= -16 && parsed <= 15) // uh wait what?
+                if (parsed >= -(1 << len) && parsed <= (1 << len) - 1)
                 {
                     return parsed;
                 }
@@ -244,7 +240,7 @@ namespace LC_Sharp
                 var isImm5 = false;
                 try
                 {
-                    var imm5 = AssemblerUtil.expectImm5(tokens[3]);
+                    var imm5 = AssemblerUtil.ExpectImm(tokens[3], 5);
                     isImm5 = true;
                     op2 = (ushort) (0 + (imm5 < 0 ? 0x10 : 0x00) + (imm5 & 0x000F));
                 }
@@ -270,7 +266,7 @@ namespace LC_Sharp
                 var isImm5 = false;
                 try
                 {
-                    var imm5 = AssemblerUtil.expectImm5(tokens[3]);
+                    var imm5 = AssemblerUtil.ExpectImm(tokens[3], 5);
                     isImm5 = true;
                     op2 = (ushort) (0 + (imm5 < 0 ? 0x10 : 0x00) + (imm5 & 0x000F));
                 }
@@ -352,6 +348,69 @@ namespace LC_Sharp
             public string Disassemble(ushort instruction)
             {
                 throw new NotImplementedException();
+            }
+        }
+
+        public abstract class MemoryAccessInstruction : IInstructionAssembler
+        {
+            private readonly string _instr;
+            protected readonly ushort _opcode;
+
+            protected MemoryAccessInstruction(string instr, ushort opcode)
+            {
+                _instr = instr;
+                _opcode = opcode;
+            }
+            
+            public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
+            {
+                var tokens = sourceInstruction.Split(' ', ',').Where(s => s.Length > 0).ToArray();
+                if (_instr != tokens[0])
+                {
+                    throw new AssemblerException(sourceInstruction, "Instruction mismatch");
+                }
+
+                var reg1 = AssemblerUtil.expectRegister(tokens[1]);
+                return ContinueAssemble(offset, environment, reg1, tokens);
+            }
+
+            protected abstract ushort ContinueAssemble(ushort offset, ParsedFile env, ushort reg1, string[] tokens);
+
+            public string Disassemble(ushort instruction)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public sealed class LabelBasedMemoryAccessInstruction : MemoryAccessInstruction
+        {
+            public LabelBasedMemoryAccessInstruction(string instr, ushort opcode) : base(instr, opcode)
+            {
+            }
+
+            protected override ushort ContinueAssemble(ushort offset, ParsedFile env, ushort reg1, string[] tokens)
+            {
+                var labelTarget = AssemblerUtil.expectLabel(tokens[2], env.LabelTable);
+                var offset9 = offset + 1 - labelTarget;
+                if (offset9 > 511)
+                {
+                    throw new AssemblerException(tokens[2], "Unreachable label");
+                }
+                return (ushort) ((_opcode << 12) | (reg1 << 9) | (offset9 & 0x01FF));
+            }
+        }
+
+        public sealed class OffsetBasedMemoryAccessInstruction : MemoryAccessInstruction
+        {
+            public OffsetBasedMemoryAccessInstruction(string instr, ushort opcode) : base(instr, opcode)
+            {
+            }
+
+            protected override ushort ContinueAssemble(ushort offset, ParsedFile env, ushort reg1, string[] tokens)
+            {
+                var reg2 = AssemblerUtil.expectRegister(tokens[2]);
+                var offset6 = AssemblerUtil.ExpectImm(tokens[3], 6);
+                return (ushort) ((_opcode << 12) | (reg1 << 9) | (reg2 << 6) | (offset6 & 0x003F));
             }
         }
     }
