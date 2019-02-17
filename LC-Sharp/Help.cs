@@ -21,6 +21,15 @@
                 return s;
             }
         }
+		public static string ToHexShort(this int s) {
+			return $"0x{s.ToString("X").PadLeft(4, '0')}";
+		}
+		public static string PadSurround(this string s, int length, char c) => s.PadLeft(s.Length + (length - s.Length) / 2, c).PadRight(length, c);
+		public static string ToRegisterString(this ushort r) => ((int)r).ToRegisterString();
+		public static string ToRegisterString(this short r) => ((int)r).ToRegisterString();
+		public static string ToRegisterString(this int r) {
+			return $"0x{r.ToString("X").PadRight(6)} #{r.ToString().PadRight(6)}";
+		}
         /*
         //Functions to be used with ushorts containing smaller-sized numbers
         //Converts ushort to short with equivalent bit pattern

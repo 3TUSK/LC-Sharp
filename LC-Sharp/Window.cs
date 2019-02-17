@@ -11,36 +11,29 @@ namespace LC_Sharp {
         LC3 lc3;
         Window window;
         ScrollView instructions;
+		Label status;
         Label[] registerLabels;
         Label pcLabel, irLabel;
-        private Button runButton;
+        private Button runAllButton;
+		private Button runStepButton;
+		//Note: Still need Run Step Over
 		bool running;
 
-        public void Update() {
-            for(int i = 0; i < 8; i++) {
-                var r = lc3.processing.registers[i];
-                registerLabels[i].Text = $"R{i + 1} 0x{r.ToString("X").PadRight(6)} #{lc3.processing.registers[i].ToString().PadRight(6)}";
-            }
-            pcLabel.Text = $"PC 0x{lc3.control.pc.ToString("X").PadRight(6)} #{lc3.control.pc.ToString().PadRight(6)}";
-            irLabel.Text = $"PC 0x{lc3.control.ir.ToString("X").PadRight(6)} #{lc3.control.ir.ToString().PadRight(6)}";
-        }
         public Emulator() {
-            Console.SetWindowSize(96, 48);
+			lc3 = new LC3();
+			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
-            instructions = new ScrollView(new Rect(0, 0, 30, 44), new Rect(0, 0, 30, 440));
+            instructions = new ScrollView(new Rect(0, 0, 30, 42), new Rect(0, 0, 30, 0xFF));
             instructions.ShowVerticalScrollIndicator = true;
-            
-			for(int i = 0; i < 0xFF; i++) {
-				instructions.Add(new Label(0, i, i.ToString("X")));
-			}
-
-            {
+			instructions.Scrolled += _ => UpdateInstructionsView();
+			UpdateInstructionsView();
+			{
                 Window w = new Window(new Rect(0, 0, 32, 46), "Instructions");
                 w.Add(instructions);
                 window.Add(w);
             }
-            
-            registerLabels = new Label[8];
+
+			registerLabels = new Label[8];
             for(int i = 0; i < 8; i++) {
                 registerLabels[i] = new Label(1, i, $"R{i+1}");
             }
@@ -54,26 +47,120 @@ namespace LC_Sharp {
             }
             Window labels = new Window(new Rect(32, 16, 16, 16), "Labels");
             window.Add(labels);
-            runButton = new Button(32, 32, "Run", RunButtonClicked);
-            window.Add(runButton);
 
+			status = new Label(new Rect(32, 32, 16, 4), "");
+			ResetStatus();
+			window.Add(status);
+
+            runAllButton = new Button(32, 33, "Run All", ClickRunAll);
+			runStepButton = new Button(32, 34, "Run Step", ClickRunStep);
+			window.Add(runAllButton);
+			window.Add(runStepButton);
         }
-		public void RunButtonClicked() {
-			if(running) {
-				running = false;
-				Application.MainLoop.RemoveIdle(RunAll);
-				runButton.Text = "Stop";
-			} else {
-				running = true;
-				Application.MainLoop.AddIdle(RunAll);
-				runButton.Text = "Pause";
+		public void ResetStatus() {
+			switch(lc3.status) {
+				case LC3.Status.ACTIVE:
+					status.Text = "Idle".PadSurround(16, '-');
+					break;
+				case LC3.Status.HALT:
+					status.Text = "Halt".PadSurround(16, '-');
+					break;
+				case LC3.Status.TRAP:
+					status.Text = "Waiting".PadSurround(16, '-');
+					break;
+				case LC3.Status.ERROR:
+					status.Text = "ERROR".PadSurround(16, '-');
+					break;
 			}
 		}
+		public void UpdateRegisterView() {
+			for (int i = 0; i < 8; i++) {
+				var r = lc3.processing.registers[i];
+				registerLabels[i].Text = $"R{i + 1} {r.ToRegisterString()}";
+			}
+			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
+			pcLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
+		}
+		public void UpdateInstructionsView() {
+			int start = -instructions.ContentOffset.Y;	//ContentOffset.Y is equal to the negative of the vertical scroll index
+			instructions.RemoveAll();
+			for(int i = 0; i < 40; i++) {
+				int index = start + i;
+				instructions.Add(new Label(0, index, index.ToHexShort()));
+			}
+		}
+		public void ClickRunAll() {
+			if(running) {
+				StopRunAll();
+			} else {
+				//we don't run if the lc3 is halted
+				if (lc3.status == LC3.Status.HALT)
+					return;
+				running = true;
+				Application.MainLoop.AddIdle(RunAll);
+				runAllButton.Text = "Pause";
+				status.Text = "Running All".PadSurround(16, '-');
+			}
+		}
+		public void StopRunAll() {
+			running = false;
+			Application.MainLoop.RemoveIdle(RunAll);
+			runAllButton.Text = "Run All";
+			ResetStatus();
+		}
         public bool RunAll() {
-            runButton.Enabled = false;
-            runButton.Text += "a";
-            return true;
+			Run();
+			if(lc3.status != LC3.Status.HALT && lc3.status != LC3.Status.ERROR) {
+				return true;  //We keep running as long as we are active
+			} else {
+				//Otherwise we are done running
+				StopRunAll();
+				return false;
+			}
+			
         }
+		public void ClickRunStep() {
+			if (running) {
+				StopRunStep();
+			} else {
+				//we don't run if the lc3 is halted
+				if (lc3.status == LC3.Status.HALT || lc3.status == LC3.Status.ERROR)
+					return;
+				running = true;
+				Application.MainLoop.AddIdle(RunStep);
+				runStepButton.Text = "Pause";
+				status.Text = "Running Step".PadSurround(16, '-');
+			}
+		}
+		public void StopRunStep() {
+			running = false;
+			Application.MainLoop.RemoveIdle(RunStep);
+			runStepButton.Text = "Run Step";
+			ResetStatus();
+		}
+		public bool RunStep() {
+			Run();
+			//If we are running a TRAP instruction, we should wait for it to finish
+			if (lc3.status == LC3.Status.TRAP) {
+				return true;
+			} else {
+				StopRunStep();
+				return false;
+			}
+		}
+		public void Run() {
+			//If we are running a TRAP instruction, we rerun it until it's done
+			if (lc3.status == LC3.Status.TRAP) {
+				lc3.Fetch();
+			}
+
+			if(lc3.control.ir == 0) {
+				lc3.status = LC3.Status.ERROR;
+				return;
+			}
+
+			lc3.Execute();
+		}
         public void Init() {
             //Application.UseSystemConsole = true;
             Application.Init();
@@ -83,6 +170,6 @@ namespace LC_Sharp {
             Application.Run(window);
 
             instructions.CanFocus = true;
-        }
+		}
     }
 }

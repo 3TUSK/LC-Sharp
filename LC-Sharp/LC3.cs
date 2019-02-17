@@ -9,10 +9,15 @@ namespace LC_Sharp {
         public Processing processing;
 		public Memory memory;
 		public ushort bus;
+		public enum Status {
+			ACTIVE, TRAP, ERROR, HALT
+		}
+		public Status status;
 		public LC3() {
             control = new Control(this);
             memory = new Memory(this);
             processing = new Processing(this);
+			status = Status.ACTIVE;
 		}
         public void DebugPrint() {
             processing.DebugPrint();
@@ -233,6 +238,8 @@ namespace LC_Sharp {
                     break;
                 case 0b1111:
                     //TRAP
+
+					//We set trap to true and then repeatedly attempt execute this instruction until it is done. We do not fetch while trap is active. When we are done, we set trap to false.
                     break;
 			}
 		}
