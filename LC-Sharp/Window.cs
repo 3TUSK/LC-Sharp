@@ -14,6 +14,7 @@ namespace LC_Sharp {
         Label[] registerLabels;
         Label pcLabel, irLabel;
         private Button runButton;
+		bool running;
 
         public void Update() {
             for(int i = 0; i < 8; i++) {
@@ -28,8 +29,11 @@ namespace LC_Sharp {
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
             instructions = new ScrollView(new Rect(0, 0, 30, 44), new Rect(0, 0, 30, 440));
             instructions.ShowVerticalScrollIndicator = true;
-            for (int i = 0; i < 1000; i++)
-                instructions.Add(new TextField(1, i, 8, "" + i));
+            
+			for(int i = 0; i < 0xFF; i++) {
+				instructions.Add(new Label(0, i, i.ToString("X")));
+			}
+
             {
                 Window w = new Window(new Rect(0, 0, 32, 46), "Instructions");
                 w.Add(instructions);
@@ -50,12 +54,21 @@ namespace LC_Sharp {
             }
             Window labels = new Window(new Rect(32, 16, 16, 16), "Labels");
             window.Add(labels);
-            runButton = new Button(32, 32, "Run", () => {
-                Application.MainLoop.AddIdle(RunAll);
-            });
+            runButton = new Button(32, 32, "Run", RunButtonClicked);
             window.Add(runButton);
 
         }
+		public void RunButtonClicked() {
+			if(running) {
+				running = false;
+				Application.MainLoop.RemoveIdle(RunAll);
+				runButton.Text = "Stop";
+			} else {
+				running = true;
+				Application.MainLoop.AddIdle(RunAll);
+				runButton.Text = "Pause";
+			}
+		}
         public bool RunAll() {
             runButton.Enabled = false;
             runButton.Text += "a";
