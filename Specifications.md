@@ -29,3 +29,16 @@
 # Process
 - The `LC3` stores all data in the form of `short` integers, or "shortcode."
 - The `Assembler` first converts all the string code into "shortcode" and then writes it into the `LC3`'s memory.
+
+# GUI
+- Instructions view
+  - When an instruction is executed, the view snaps to center on the instruction and highlights it
+  - When scrolled, we regenerate the labels
+# CLI
+- In CLI mode, the emulator Runs the entire program
+- Input
+  - If an input file is specified, then all input is taken from it. If the input file ends before the program is done taking input, then we return an error.
+  - Otherwise, we get it through `ReadKey(true)`, which does not echo key presses (since the program should already do that).
+- Output
+  - If an output file is specified, then at the end of the program, we compare the output to the file.
+  - Otherwise, output is printed to console
