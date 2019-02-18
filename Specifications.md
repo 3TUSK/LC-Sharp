@@ -1,5 +1,5 @@
 # Specifications
-- `LC3`: The main module representing the LC3 FSM.
+- `LC3`: The main module representing the LC3 FSM. Functionality is split into smaller modules according to the von Neumann model.
   - `control`: An instance of the Control module
   - `memory`: An instance of the Memory module
   - `processing`: An instance of the Processing module
@@ -7,8 +7,25 @@
   - `Execute()`: Executes the instruction code stored in IR by setting the control signals in `control`, `memory`, and `processing`.
 - `Control`: Contains the PC and IR
   - `lc3`: A reference to the parent.
-  - `pc`: A `ushort` representing the PC value.
-  - `ir`: A `ushort` representing the IR value.
+  - `pc`: A `ushort` for the PC.
+  - `ir`: A `ushort` for the IR.
   - `ldPC()`: Sets the `pc` from `pcmuxout` in the parent's `processing`
-  - `ldIR()`: Sets the `ir` from the parent's `bus`
   - `gatePC()`: Sets the parent's `bus` to the PC
+  - `ldIR()`: Sets the `ir` from the parent's `bus`
+- `Memory`: Contains the data of the LC-3's main memory
+  - `mar`: A `ushort` for the MAR.
+  - `mdr`: A `ushort` for the MDR.
+  - `mem`: A `Dictionary<ushort, ushort>` that maps addresses to data.
+  - `ldMAR()`: Sets `mar` to the `bus`.
+  - `ldMDR()`: Sets `mdr` to the `bus`.
+  - `gateMAR()`: Sets the `bus` to `mar`.
+  - `gateMDR()`: Sets the `bus` to `mdr`.
+  - `memEnR()`: Writes the data of `mem` at the address in `mar` to `mdr`.
+  - `memEnW()`: Writes the data of `mdr` to `mem` at the address in `mar`
+  - `Read(ushort mar)`: Used by the handler to directly read from memory
+  - `Write(ushort mar, ushort mdr)`: Used by the handler to directly write to memory
+- `Assembler`: Current implementation of the LC-3 assembler. Converts assembly string code to shortcode
+
+# Process
+- The `LC3` stores all data in the form of `short` integers, or "shortcode."
+- The `Assembler` first converts all the string code into "shortcode" and then writes it into the `LC3`'s memory.
