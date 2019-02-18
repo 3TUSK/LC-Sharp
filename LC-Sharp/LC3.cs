@@ -13,6 +13,9 @@ namespace LC_Sharp {
 			ACTIVE, TRAP, ERROR, HALT
 		}
 		public Status status;
+
+		public bool Active => status == Status.ACTIVE || status == Status.TRAP;
+
 		public LC3() {
             control = new Control(this);
             memory = new Memory(this);
@@ -280,7 +283,7 @@ namespace LC_Sharp {
         public void AssembleToPC(string instruction) {
             line = 1;
             if (Instruction(lc3.control.pc, instruction, out ushort u)) {
-                lc3.memory.WriteToMemory(lc3.control.pc, u);
+                lc3.memory.Write(lc3.control.pc, u);
             } else {
                 throw new Exception($"Invalid instruction {instruction}");
             }
@@ -298,7 +301,7 @@ namespace LC_Sharp {
             Parse:
             if (Instruction(lc3.control.pc, line, out ushort u)) {
                 //If this names an instruction, we treat it like one
-                lc3.memory.WriteToMemory((ushort)(lc3.control.pc - 1), u);
+                lc3.memory.Write((ushort)(lc3.control.pc - 1), u);
             } else if (line.StartsWith(".")) {
                 //Period marks a directive
                 Directive(line);

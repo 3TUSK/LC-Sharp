@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Terminal.Gui;
+using Attribute = Terminal.Gui.Attribute;
 
 namespace LC_Sharp {
     class Emulator {
@@ -13,9 +14,14 @@ namespace LC_Sharp {
         ScrollView instructions;
 		Label status;
         Label[] registerLabels;
+		Label ccLabel;
         Label pcLabel, irLabel;
         private Button runAllButton;
-		private Button runStepButton;
+		private Button runStepOnceButton;
+		ushort instructionPC;
+
+		TextView input, output;
+
 		//Note: Still need Run Step Over
 		bool running;
 
@@ -23,12 +29,12 @@ namespace LC_Sharp {
 			lc3 = new LC3();
 			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
-            instructions = new ScrollView(new Rect(0, 0, 30, 42), new Rect(0, 0, 30, 0xFF));
+            instructions = new ScrollView(new Rect(0, 0, 30, 40), new Rect(0, 0, 30, 0xFFFF));
             instructions.ShowVerticalScrollIndicator = true;
 			instructions.Scrolled += _ => UpdateInstructionsView();
 			UpdateInstructionsView();
 			{
-                Window w = new Window(new Rect(0, 0, 32, 46), "Instructions");
+                Window w = new Window(new Rect(0, 0, 32, 42), "Instructions");
                 w.Add(instructions);
                 window.Add(w);
             }
@@ -37,11 +43,15 @@ namespace LC_Sharp {
             for(int i = 0; i < 8; i++) {
                 registerLabels[i] = new Label(1, i, $"R{i+1}");
             }
-            pcLabel = new Label(1, 9, "PC");
-            irLabel = new Label(1, 10, "IR");
+
+			ccLabel = new Label(1, 9, "CC");
+
+            pcLabel = new Label(1, 11, "PC");
+            irLabel = new Label(1, 12, "IR");
             {
                 Window w = new Window(new Rect(32, 0, 16, 16), "Registers");
                 w.Add(registerLabels);
+				w.Add(ccLabel);
                 w.Add(pcLabel, irLabel);
                 window.Add(w);
             }
@@ -53,10 +63,27 @@ namespace LC_Sharp {
 			window.Add(status);
 
             runAllButton = new Button(32, 33, "Run All", ClickRunAll);
-			runStepButton = new Button(32, 34, "Run Step", ClickRunStep);
+			runStepOnceButton = new Button(32, 34, "Run Step", ClickRunStep);
 			window.Add(runAllButton);
-			window.Add(runStepButton);
-        }
+			window.Add(runStepOnceButton);
+
+			{
+				var w = new Window(new Rect(48, 0, 42, 22), "Output");
+				output = new TextView(new Rect(0, 0, 40, 20));
+				output.Text = "";
+				output.ReadOnly = true;
+				w.Add(output);
+				window.Add(w);
+			}
+
+			{
+				var w = new Window(new Rect(48, 22, 42, 22), "Input");
+				input = new TextView(new Rect(0, 0, 40, 20));
+				input.Text = "";
+				w.Add(input);
+				window.Add(w);
+			}
+		}
 		public void ResetStatus() {
 			switch(lc3.status) {
 				case LC3.Status.ACTIVE:
@@ -73,28 +100,69 @@ namespace LC_Sharp {
 					break;
 			}
 		}
+		public void UpdateInstructionsView() {
+			int start = -instructions.ContentOffset.Y;	//ContentOffset.Y is equal to the negative of the vertical scroll index
+			instructions.RemoveAll();
+
+			Label[] labels = new Label[40];
+			for(int i = 0; i < 40; i++) {
+				int index = start + i;
+				labels[i] = new Label(0, index, index.ToHexShort());
+			}
+
+			var l = labels.ElementAtOrDefault(lc3.control.pc - start);
+			if (l != null) {
+				l.TextColor = MakeColor(ConsoleColor.White);
+			}
+
+			instructions.Add(labels);
+		}
 		public void UpdateRegisterView() {
 			for (int i = 0; i < 8; i++) {
 				var r = lc3.processing.registers[i];
 				registerLabels[i].Text = $"R{i + 1} {r.ToRegisterString()}";
 			}
+			ccLabel.Text = $"CC {(lc3.processing.N ? 'N' : lc3.processing.Z ? 'Z' : lc3.processing.P ? 'P' : '?')}";
+
 			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
-			pcLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
+			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
 		}
-		public void UpdateInstructionsView() {
-			int start = -instructions.ContentOffset.Y;	//ContentOffset.Y is equal to the negative of the vertical scroll index
-			instructions.RemoveAll();
-			for(int i = 0; i < 40; i++) {
-				int index = start + i;
-				instructions.Add(new Label(0, index, index.ToHexShort()));
+		public void UpdateIOView() {
+			ushort kbsr = 0xFE00;
+			ushort kbdr = 0xFE02;
+
+			//See if KBSR is waiting for input
+			if(lc3.memory.Read(kbsr) == 0) {
+				//Check if we have input ready
+				if(input.Text.Length > 0) {
+					lc3.memory.Write(kbsr, 0xFFFF);			//Set KBSR ready
+					lc3.memory.Write(kbdr, input.Text[0]);	//Write in the first character from input window
+					input.Text = input.Text.Substring(1);	//Consume the first character from input window
+				}
 			}
+			
+
+
+			ushort dsr = 0xFE04;
+			ushort ddr = 0xFE06;
+
+			//DSR is waiting for output
+			if(lc3.memory.Read(dsr) == 0) {
+				char c = (char) lc3.memory.Read(ddr);		//Read char from DDR
+				output.Text = output.Text.ToString() + c;	//Send char to output window
+				lc3.memory.Write(dsr, 0xFFFF);              //Set DSR ready
+			}
+		}
+		public static Attribute MakeColor(ConsoleColor f) {
+			// Encode the colors into the int value.
+			return new Attribute((int)f & 0xffff);
 		}
 		public void ClickRunAll() {
 			if(running) {
 				StopRunAll();
 			} else {
 				//we don't run if the lc3 is halted
-				if (lc3.status == LC3.Status.HALT)
+				if (!lc3.Active)
 					return;
 				running = true;
 				Application.MainLoop.AddIdle(RunAll);
@@ -110,7 +178,7 @@ namespace LC_Sharp {
 		}
         public bool RunAll() {
 			Run();
-			if(lc3.status != LC3.Status.HALT && lc3.status != LC3.Status.ERROR) {
+			if(lc3.Active) {
 				return true;  //We keep running as long as we are active
 			} else {
 				//Otherwise we are done running
@@ -124,18 +192,18 @@ namespace LC_Sharp {
 				StopRunStep();
 			} else {
 				//we don't run if the lc3 is halted
-				if (lc3.status == LC3.Status.HALT || lc3.status == LC3.Status.ERROR)
+				if (!lc3.Active)
 					return;
 				running = true;
 				Application.MainLoop.AddIdle(RunStep);
-				runStepButton.Text = "Pause";
+				runStepOnceButton.Text = "Pause";
 				status.Text = "Running Step".PadSurround(16, '-');
 			}
 		}
 		public void StopRunStep() {
 			running = false;
 			Application.MainLoop.RemoveIdle(RunStep);
-			runStepButton.Text = "Run Step";
+			runStepOnceButton.Text = "Run Step";
 			ResetStatus();
 		}
 		public bool RunStep() {
@@ -149,8 +217,15 @@ namespace LC_Sharp {
 			}
 		}
 		public void Run() {
+			//Set the instructions pane to highlight the current PC
+			instructionPC = lc3.control.pc; //Set highlighted instruction PC
+			//Show the highlighted instruction in the center
+			instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height/2);
+			UpdateInstructionsView();
+			
 			//If we are running a TRAP instruction, we rerun it until it's done
-			if (lc3.status == LC3.Status.TRAP) {
+			//Note: We should modify this so that TRAP instructions still run PC as normal but don't update the highlighted instruction
+			if (lc3.status != LC3.Status.TRAP) {
 				lc3.Fetch();
 			}
 
@@ -160,6 +235,9 @@ namespace LC_Sharp {
 			}
 
 			lc3.Execute();
+
+			UpdateRegisterView();
+			UpdateIOView();
 		}
         public void Init() {
             //Application.UseSystemConsole = true;
