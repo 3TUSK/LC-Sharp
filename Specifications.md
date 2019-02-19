@@ -1,8 +1,3 @@
-## Notes
-- The `LC3` stores all data in the form of `short` integers, or "shortcode."
-- The `Assembler` first converts all the string code into "shortcode" and then writes it into the `LC3`'s memory.
-- The execution of the `LC3` program is handled by the user interface.
-
 # Specifications
 - `LC3`: The main module representing the LC3 FSM. Functionality is split into smaller modules according to the von Neumann model.
   - `control`: An instance of the Control module
@@ -29,13 +24,13 @@
   - `memEnW()`: Writes the data of `mdr` to `mem` at the address in `mar`
   - `Read(ushort mar)`: Used by the handler to directly read from memory
   - `Write(ushort mar, ushort mdr)`: Used by the handler to directly write to memory
-- `Assembler`: Current implementation of the LC-3 assembler. Converts assembly string code to shortcode.
+- `Assembler`: Current implementation of the LC-3 assembler. Converts assembly string code to short integer data, or shortcode.
 
 # GUI
 ```
 lcs -g {program_file} [input_file] [output_file]
 ```
-- Instructions view
+- Instructions
   - A scrollable view of the LC-3's main memory. The current instruction about to be executed is highlighted.
   - When an instruction is fetched, the view snaps to center on the instruction and highlights it. Exception: TRAP subroutines do not affect this view during execution.
   - When scrolled, we dynamically regenerate the labels.
@@ -75,8 +70,11 @@ lcs -c {program_file} [input_file] [output_file]
 ```
 - In CLI mode, the emulator runs the entire program with no GUI.
 - Input
-  - If we have an output file, then we read all input from it. If the input file ends before the program is done taking input, then we throw an error.
+  - If we have an output file, then we read all input from it.
+    - If the input file ends before the program is done taking input, then we throw an error.
   - Otherwise, we get it through `ReadKey(true)`, which does not echo key presses (since the program should already do that).
 - Output
   - If we have an output file, then we write all output to it.
   - Otherwise, output is printed to console
+# Macros
+- Custom TRAP Subroutines
