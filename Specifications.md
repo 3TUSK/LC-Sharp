@@ -1,4 +1,4 @@
-# Specifications
+# Classes
 - `LC3`: The main module representing the LC3 FSM. Functionality is split into smaller modules according to the von Neumann model.
   - `control`: An instance of the Control module
   - `memory`: An instance of the Memory module
@@ -78,3 +78,6 @@ lcs -c {program_file} [input_file] [output_file]
   - Otherwise, output is printed to console
 # Macros
 - Custom TRAP Subroutines
+# Compiling
+- Install Visual Studio Community 2017
+- We require a modified GUI library available at [INeedAUniqueUsername/gui.cs](https://github.com/INeedAUniqueUsername/gui.cs)
