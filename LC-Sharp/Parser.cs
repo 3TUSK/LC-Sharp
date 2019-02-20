@@ -163,9 +163,25 @@ namespace LC_Sharp
     {
         // Read the source file from given path, and perform only the first round of assembly.
         // The parsed result can be later used directly for second round of assembly.
-        public ParsedFile Parse(string path)
-        {           
-            var lines = File.ReadAllLines(path, Encoding.UTF8);
+        public ParsedFile ParseFile(string path)
+        {
+            return Parse(File.ReadAllLines(path));
+        }
+        
+        public ParsedFile Parse(FileStream input)
+        {
+            var sink = new List<string>();
+            var reader = new StreamReader(input);
+            while (!reader.EndOfStream)
+            {
+                sink.Add(reader.ReadLine());
+            }
+            reader.Close();
+            return Parse(sink.ToArray());
+        }
+
+        public ParsedFile Parse(params string[] lines)
+        {
             var controller = new ParserController();
             // Use index-based loop for deterministic iteration order
             for (var i = 0; i < lines.Length; i++)
@@ -190,12 +206,7 @@ namespace LC_Sharp
 
             return controller.Assemble();
         }
-        
-        public ParsedFile Parse(FileStream input)
-        {
-            // TODO Looks like there isn't a convenient method to read all lines from FileStream
-            return null;
-        }
+
     }
     
     public class InstructionEntry
