@@ -58,7 +58,8 @@ namespace LC_Sharp
             Assemblers[instr] = assembler;
         }
 
-        public static IInstructionAssembler Find(string instName) => Assemblers[instName];
+        public static IInstructionAssembler Find(string instName)
+            => Assemblers.TryGetValue(instName, out var instruction) ? instruction : null;        
     }
     
     public class NeoAssembler
@@ -188,7 +189,7 @@ namespace LC_Sharp
             
             public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
             {
-                if (sourceInstruction == _instr)
+                if (sourceInstruction.Trim() == _instr)
                 {
                     return _assembleResult;
                 }

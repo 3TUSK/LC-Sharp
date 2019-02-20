@@ -31,6 +31,7 @@ namespace LC_Sharp
 
         private bool isComment;
         private bool isInstruction;
+        private bool isAssembleInstruction;
         private bool isFinished; // Used by .END pseudo-instruction
         private string currentComment = "";
 
@@ -51,17 +52,23 @@ namespace LC_Sharp
             }
             else
             {
-                ConstructInstruction();
-                if (isInstruction)
+                if (isInstruction || isAssembleInstruction)
                 {
                     sourceInst += token;
                 }
-                if (instr.Contains(token.ToUpper()))
+                else if (instr.Contains(token.ToUpper()))
                 {
                     isComment = false;
                     isInstruction = true;
                     sourceInst += token;
                     sourceInst += " "; // TODO 
+                }
+                else if (token[0] == '.' && _pseudoOps.ContainsKey(token.Substring(1).ToUpper()))
+                {
+                    isComment = false;
+                    isAssembleInstruction = true;
+                    sourceInst += token;
+                    sourceInst += " "; // TODO
                 }
                 else
                 {
@@ -84,7 +91,16 @@ namespace LC_Sharp
             comments.Add(currentComment);
             currentComment = "";
             isComment = false;
-            isInstruction = false;
+            if (isInstruction)
+            {
+                ConstructInstruction();
+                isInstruction = false;
+            }
+            else if (isAssembleInstruction)
+            {
+                ConstructInstruction();
+                isAssembleInstruction = false;
+            }
         }
 
         public void Terminate() => isFinished = true;
@@ -154,12 +170,15 @@ namespace LC_Sharp
             // Use index-based loop for deterministic iteration order
             for (var i = 0; i < lines.Length; i++)
             {
-                var tokens = lines[i].Split(' ');
                 controller.BeginLine();
-                // Same above
-                for (var j = 0; j < tokens.Length; j++)
+                if (lines[i].Length > 0)
                 {
-                    controller.Accept(tokens[j]);
+                    var tokens = lines[i].Split(' ');
+                    // Same above
+                    for (var j = 0; j < tokens.Length; j++)
+                    {
+                        controller.Accept(tokens[j]);
+                    }
                 }
                 controller.EndLine();
 
