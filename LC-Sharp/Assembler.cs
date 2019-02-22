@@ -93,6 +93,27 @@ namespace LC_Sharp
 
         string Disassemble(ushort instruction); // TODO Guess we need an environment to properly translate offset to labels.
     }
+    
+    public class StandardInstructionAssembler : IInstructionAssembler
+    {
+        // TODO (3TUSK): Get rid of that strange instruction assembler hierarchy by using standardized token system (see below StandardOperands)
+        ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
+        {
+            throw new Exception("Not implemented yet");
+        }
+        string Disassemble(ushort instruction)
+        {
+            throw new Exception("Not implemented yet");
+        }
+    }
+
+    public class StandardOperands
+    {
+        //public static readonly StandardOperands REGISTER
+        //public static readonly StandardOperands LABEL // TODO (3TUSK): there are PCOffset9 and PCOffset11
+        //public static readonly StandardOperands IMMEDIATE_5 // TODO (3TUSK): there is also offset 6
+        //public static readonly StandardOperands TRAP_VECTOR
+    }
 
     // An exception that may be thrown from IInstructionAssembler
     public class AssemblerException : Exception
