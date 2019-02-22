@@ -28,7 +28,7 @@
 		public static string ToRegisterString(this ushort r) => ((int)r).ToRegisterString();
 		public static string ToRegisterString(this short r) => ((int)r).ToRegisterString();
 		public static string ToRegisterString(this int r) {
-			return $"0x{r.ToString("X").PadRight(6)} #{r.ToString().PadRight(6)}";
+			return $"0x{r.ToString("X").PadLeft(4, '0')} #{r.ToString()}";
 		}
         /*
         //Functions to be used with ushorts containing smaller-sized numbers

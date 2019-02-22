@@ -23,7 +23,12 @@ namespace LC_Sharp {
 		}
 		public void memEnW() => mem[mar] = mdr;
         public void Write(ushort mar, ushort mdr) => mem[mar] = mdr;
-        public ushort Read(ushort mar) => mem[mar];
+		public ushort Read(ushort mar) {
+			if(!mem.ContainsKey(mar)) {
+				mem[mar] = 0;
+			}
+			return mem[mar];
+		}
 	}
     
 }

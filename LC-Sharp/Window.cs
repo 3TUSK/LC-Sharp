@@ -10,7 +10,8 @@ using Attribute = Terminal.Gui.Attribute;
 namespace LC_Sharp {
     class Emulator {
         LC3 lc3;
-        Window window;
+		Assembler assembly;
+		Window window;
         ScrollView instructions;
 		Label status;
         Label[] registerLabels;
@@ -27,6 +28,8 @@ namespace LC_Sharp {
 
         public Emulator() {
 			lc3 = new LC3();
+			assembly = new Assembler(lc3);
+			assembly.AssembleToPC("ADD R0, R0, #10");
 			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
             instructions = new ScrollView(new Rect(0, 0, 30, 40), new Rect(0, 0, 30, 0xFFFF));
@@ -49,13 +52,13 @@ namespace LC_Sharp {
             pcLabel = new Label(1, 11, "PC");
             irLabel = new Label(1, 12, "IR");
             {
-                Window w = new Window(new Rect(32, 0, 16, 16), "Registers");
+                Window w = new Window(new Rect(32, 0, 32, 16), "Registers");
                 w.Add(registerLabels);
 				w.Add(ccLabel);
                 w.Add(pcLabel, irLabel);
                 window.Add(w);
             }
-            Window labels = new Window(new Rect(32, 16, 16, 16), "Labels");
+            Window labels = new Window(new Rect(32, 16, 32, 16), "Labels");
             window.Add(labels);
 
 			status = new Label(new Rect(32, 32, 16, 4), "");
@@ -68,7 +71,7 @@ namespace LC_Sharp {
 			window.Add(runStepOnceButton);
 
 			{
-				var w = new Window(new Rect(48, 0, 42, 22), "Output");
+				var w = new Window(new Rect(64, 0, 42, 22), "Output");
 				output = new TextView(new Rect(0, 0, 40, 20));
 				output.Text = "";
 				output.ReadOnly = true;
@@ -77,7 +80,7 @@ namespace LC_Sharp {
 			}
 
 			{
-				var w = new Window(new Rect(48, 22, 42, 22), "Input");
+				var w = new Window(new Rect(64, 22, 42, 22), "Input");
 				input = new TextView(new Rect(0, 0, 40, 20));
 				input.Text = "";
 				w.Add(input);
@@ -107,7 +110,7 @@ namespace LC_Sharp {
 			Label[] labels = new Label[40];
 			for(int i = 0; i < 40; i++) {
 				int index = start + i;
-				labels[i] = new Label(0, index, index.ToHexShort());
+				labels[i] = new Label(0, index, $" {index.ToHexShort()} {assembly.Dissemble((ushort)index, lc3.memory.Read((ushort)index))}");
 			}
 
 			var l = labels.ElementAtOrDefault(lc3.control.pc - start);
@@ -224,7 +227,7 @@ namespace LC_Sharp {
 			UpdateInstructionsView();
 			
 			//If we are running a TRAP instruction, we rerun it until it's done
-			//Note: We should modify this so that TRAP instructions still run PC as normal but don't update the highlighted instruction
+			//Note: We should modify this so that TRAP instructions still run PC as normal but don't update or center the highlighted instruction
 			if (lc3.status != LC3.Status.TRAP) {
 				lc3.Fetch();
 			}
