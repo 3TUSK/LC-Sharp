@@ -3,15 +3,15 @@
 namespace LC_Sharp {
     public class Processing {
         private LC3 lc3;
-        private ushort pc => lc3.control.pc;
-        private ushort ir => lc3.control.ir;
+        private short pc => lc3.control.pc;
+        private short ir => lc3.control.ir;
 
         public enum MARMUX {
             addradd,
             ir8
         }
         public MARMUX marmux;
-        public ushort marmuxout => (ushort)(
+        public short marmuxout => (short)(
             marmux == MARMUX.addradd ? lc3.processing.addradd :
             lc3.bus
             );
@@ -32,7 +32,7 @@ namespace LC_Sharp {
             inc,
         }
         public PCMUX pcmux;
-        public ushort pcmuxout => (ushort)(
+        public short pcmuxout => (short)(
             pcmux == PCMUX.bus ? lc3.bus :
             pcmux == PCMUX.addrAdd ? addradd :
             pc + 1);
@@ -40,7 +40,7 @@ namespace LC_Sharp {
             ir8_6,
             ir11_9
         }
-        public ushort sr1 => (ushort) (
+        public short sr1 => (short) (
             sr1mux == SR1MUX.ir8_6 ? ((ir & 0b111000000) >> 6) :
             ((ir & 0b0000111000000000) >> 9));
         public SR1MUX sr1mux;
@@ -51,7 +51,7 @@ namespace LC_Sharp {
             b111
         }
         public DRMUX drmux;
-        private ushort dr => (ushort)(drmux == DRMUX.ir11_9 ? ((ir & 0b0000111000000000) >> 9) : 7);
+        private short dr => (short)(drmux == DRMUX.ir11_9 ? ((ir & 0b0000111000000000) >> 9) : 7);
         public enum ADDR1MUX {
             sr1out,
             pc
@@ -71,7 +71,7 @@ namespace LC_Sharp {
                 addr2mux == ADDR2MUX.ir9 ? ((short)(ir & 0b1_1111_1111)).signExtend(9) :
                 addr2mux == ADDR2MUX.ir6 ? ((short)(ir & 0b11_1111)).signExtend(6) :
                 0);
-        public ushort addradd => (ushort)(addr1 + addr2);
+        public short addradd => (short)(addr1 + addr2);
         public short aluA => sr1out;
         public enum SR2MUX {
             ir5,
@@ -85,7 +85,7 @@ namespace LC_Sharp {
             add, and, not, passthrough
         }
         public ALUK aluk;
-        public ushort alu => (ushort)(
+        public short alu => (short)(
             aluk == ALUK.add ? aluA + aluB :
             aluk == ALUK.and ? aluA & aluB :
             aluk == ALUK.not ? ~aluA :

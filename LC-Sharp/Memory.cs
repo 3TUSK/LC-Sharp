@@ -3,11 +3,11 @@
 namespace LC_Sharp {
     public class Memory {
 		private LC3 lc3;
-		private ushort mar, mdr;
-		private Dictionary<ushort, ushort> mem;    //Lazily initialized memory (we only create entries right when we set or get)
+		private short mar, mdr;
+		private Dictionary<short, short> mem;    //Lazily initialized memory (we only create entries right when we set or get)
 		public Memory(LC3 lc3) {
 			this.lc3 = lc3;
-			mem = new Dictionary<ushort, ushort>();
+			mem = new Dictionary<short, short>();
 		}
 		public void ldMAR() => mar = lc3.bus;
 		public void ldMDR() => mdr = lc3.bus;
@@ -22,8 +22,8 @@ namespace LC_Sharp {
 			}
 		}
 		public void memEnW() => mem[mar] = mdr;
-        public void Write(ushort mar, ushort mdr) => mem[mar] = mdr;
-		public ushort Read(ushort mar) {
+        public void Write(short mar, short mdr) => mem[mar] = mdr;
+		public short Read(short mar) {
 			if(!mem.ContainsKey(mar)) {
 				mem[mar] = 0;
 			}

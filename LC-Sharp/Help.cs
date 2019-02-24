@@ -32,8 +32,8 @@
 		}
         /*
         //Functions to be used with ushorts containing smaller-sized numbers
-        //Converts ushort to short with equivalent bit pattern
-        public static short ToSigned(this ushort unsigned, int n = 16) {
+        //Converts ushort to ushort with equivalent bit pattern
+        public static ushort ToSigned(this ushort unsigned, int n = 16) {
             ushort maxUnsigned = (ushort) Math.Pow(2, n);   //0b1111111111111111
             ushort maxSigned = (ushort) Math.Pow(2, n - 1); //0b0111111111111111
             Console.WriteLine("Max Unsigned: " + maxUnsigned);
@@ -43,8 +43,8 @@
                 return (short) unsigned;
             }
         }
-        //Converts short to ushort with equivalent bit pattern
-        public static ushort ToUnsigned(this short signed, int n = 16) {
+        //Converts ushort to ushort with equivalent bit pattern
+        public static ushort ToUnsigned(this ushort signed, int n = 16) {
             ushort maxUnsigned = (ushort)Math.Pow(2, n); //0b1111111111111111
             if(signed < 0) {
                 //256 + (-1) = 255, 0b1_0000_0000_0000_0000 - 0b0000_0000_0000_0001 = 0b1111_1111_1111_1111

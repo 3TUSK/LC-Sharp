@@ -3,8 +3,8 @@
 namespace LC_Sharp {
     public class Control {
         private LC3 lc3;
-        public ushort pc { get; private set; }
-        public ushort ir { get; private set; }
+        public short pc { get; private set; }
+        public short ir { get; private set; }
         public Control(LC3 lc3) {
             this.lc3 = lc3;
             pc = 0x3000;
