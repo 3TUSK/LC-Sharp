@@ -13,7 +13,7 @@ namespace LC_Sharp {
         public MARMUX marmux;
         public short marmuxout => (short)(
             marmux == MARMUX.addradd ? lc3.processing.addradd :
-            lc3.bus
+            lc3.control.ir & 0xFF
             );
         public void gateMARMUX() => lc3.bus = marmuxout;
 

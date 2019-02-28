@@ -19,7 +19,7 @@ namespace LC_Sharp {
         Label pcLabel, irLabel;
         private Button runAllButton;
 		private Button runStepOnceButton;
-		ushort instructionPC;
+		short instructionPC;
 
 		TextView input, output;
 
@@ -110,7 +110,7 @@ namespace LC_Sharp {
 			Label[] labels = new Label[40];
 			for(int i = 0; i < 40; i++) {
 				int index = start + i;
-				labels[i] = new Label(0, index, $" {index.ToHexShort()} {assembly.Dissemble((ushort)index, lc3.memory.Read((ushort)index))}");
+				labels[i] = new Label(0, index, $" {index.ToHexShort()} {assembly.Dissemble((short)index, lc3.memory.Read((short)index))}");
 			}
 
 			var l = labels.ElementAtOrDefault(lc3.control.pc - start);
@@ -131,14 +131,14 @@ namespace LC_Sharp {
 			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
 		}
 		public void UpdateIOView() {
-			ushort kbsr = 0xFE00;
-			ushort kbdr = 0xFE02;
+			short kbsr = unchecked ((short)0xFE00);
+			short kbdr = unchecked ((short) 0xFE02);
 
 			//See if KBSR is waiting for input
 			if(lc3.memory.Read(kbsr) == 0) {
 				//Check if we have input ready
 				if(input.Text.Length > 0) {
-					lc3.memory.Write(kbsr, 0xFFFF);			//Set KBSR ready
+					lc3.memory.Write(kbsr, unchecked ((short) 0xFFFF));			//Set KBSR ready
 					lc3.memory.Write(kbdr, input.Text[0]);	//Write in the first character from input window
 					input.Text = input.Text.Substring(1);	//Consume the first character from input window
 				}
@@ -146,14 +146,14 @@ namespace LC_Sharp {
 			
 
 
-			ushort dsr = 0xFE04;
-			ushort ddr = 0xFE06;
+			short dsr = unchecked ((short) 0xFE04);
+			short ddr = unchecked ((short) 0xFE06);
 
 			//DSR is waiting for output
 			if(lc3.memory.Read(dsr) == 0) {
 				char c = (char) lc3.memory.Read(ddr);		//Read char from DDR
 				output.Text = output.Text.ToString() + c;	//Send char to output window
-				lc3.memory.Write(dsr, 0xFFFF);              //Set DSR ready
+				lc3.memory.Write(dsr, unchecked ((short) 0xFFFF));              //Set DSR ready
 			}
 		}
 		public static Attribute MakeColor(ConsoleColor f) {

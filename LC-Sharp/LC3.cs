@@ -14,6 +14,7 @@ namespace LC_Sharp {
 			ACTIVE, TRAP, ERROR, HALT
 		}
 		public Status status;
+		private short trapReturn;
 
 		public bool Active => status == Status.ACTIVE || status == Status.TRAP;
 
@@ -227,6 +228,10 @@ namespace LC_Sharp {
                     processing.addr2mux = Processing.ADDR2MUX.b0;
                     processing.pcmux = Processing.PCMUX.addrAdd;
                     control.ldPC();
+					//If we returned to where we entered the TRAP subroutine from, then we set status back to normal
+					if(control.pc == trapReturn) {
+						status = Status.ACTIVE;
+					}
                     break;
                 case 0b1101:
                     //RESERVED
@@ -241,9 +246,21 @@ namespace LC_Sharp {
                     processing.ldReg();
                     break;
                 case 0b1111:
-                    //TRAP
+					//TRAP
+					//We set status to TRAP until we return to this pc
+					status = Status.TRAP;
+					trapReturn = control.pc;
 
-					//We set trap to true and then repeatedly attempt execute this instruction until it is done. We do not fetch while trap is active. When we are done, we set trap to false.
+					control.gatePC();
+					processing.drmux = Processing.DRMUX.b111;
+					processing.ldReg();
+					processing.marmux = Processing.MARMUX.ir8;
+					processing.gateMARMUX();
+					memory.ldMAR();
+					memory.memEnR();
+					memory.gateMDR();
+					processing.pcmux = Processing.PCMUX.bus;
+					control.ldPC();
                     break;
 			}
 		}
@@ -255,6 +272,7 @@ namespace LC_Sharp {
 		AssemblerContext context;
         public Assembler(LC3 lc3) {
             this.lc3 = lc3;
+			context = new AssemblerContext();
         }
         public void AssembleToPC(string instruction) {
             context.line = 0;
@@ -277,10 +295,11 @@ namespace LC_Sharp {
             Parse:
             if (Instruction(line, out short u)) {
                 //If this names an instruction, we treat it like one
-                lc3.memory.Write((short)(lc3.control.pc - 1), u);
+                lc3.memory.Write((short)(context.pc - 1), u);
+				context.pc++;
             } else if (line.StartsWith(".")) {
                 //Period marks a directive
-                context.Directive(line);
+                Directive(line);
             } else {
                 if (labeled) {
                     //To do: what to do if we have two labels in a row?
@@ -299,10 +318,66 @@ namespace LC_Sharp {
 			if((instruction & 0xF000) == 0xF000) {
 				return ops.Code(instruction).Dissemble(context, instruction);
 			} else {
-				return ops.Code((short)(instruction & 0xF000)).Dissemble(context, instruction);
+				return ops.Code((short)((instruction & 0xF000) >> 12)).Dissemble(context, instruction);
 			}
 		}
+		public void Directive(string line) {
+			string[] parts = line.Split(new[] { ' ' }, 1);
+			switch (parts[0]) {
+				case ".BLKW":
+					short length = short.Parse(parts[1]);
+					for(int i = 0; i < length; i++) {
+						context.pc++;
+					}
+					break;
+				case ".FILL":
+					lc3.memory.Write((short) (context.pc - 1), Fill(parts[1]));
+					context.pc++;
+					break;
+				case ".END":
 
+					break;
+				case ".ORIG":
+					context.pc = short.Parse(parts[1], System.Globalization.NumberStyles.HexNumber);
+					break;
+				case ".STRINGZ":
+					string s = parts[1];
+					if(s.StartsWith("\"") && s.EndsWith("\"")) {
+						for(int i = 1; i < s.Length-1; i++) {
+							lc3.memory.Write((short)(context.pc - 1), (short) s[i]);
+							context.pc++;
+						}
+						lc3.memory.Write((short)(context.pc - 1), 0);
+						context.pc++;
+					}
+					break;
+			}
+			short Fill(string code) {
+				if (code.StartsWith("b")) {
+					short result = 0;
+					foreach (char digit in code.Skip(1)) {
+						if (digit == '1') {
+							result++;
+						} else if (digit != '0') {
+							context.Error($"Invalid binary digit {code}");
+						}
+						result <<= 1;
+					}
+					return result;
+				} else if (code.StartsWith("#")) {
+					return short.Parse(code.Substring(1));
+				} else if (code.StartsWith("X")) {
+					return short.Parse(code, System.Globalization.NumberStyles.HexNumber);
+				} else if (code.StartsWith("'")) {
+					if (code.Length == 3) {
+						return (short)code[1];
+					} else {
+						context.Error($"Invalid character literal {code}");
+					}
+				}
+				return 0;
+			}
+		}
 		public bool Instruction(string instruction, out short result) {
 			result = 0;
 			string opname = instruction.Split(new[] { ' ' }, 2)[0];
@@ -370,7 +445,13 @@ namespace LC_Sharp {
 			new Instruction("RET", 12, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
 			new Instruction("RESERVED", 13),
 			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("TRAP", 15)
+			new Instruction("TRAP", 15),
+			new Trap("GETC", 0x20),
+			new Trap("OUT", 0x21),
+			new Trap("PUTS", 0x22),
+			new Trap("IN", 0x23),
+			new Trap("PUTSP", 24),
+			new Trap("HALT", 0x25)
 		);
 	};
 	class OpLookup {
@@ -399,39 +480,14 @@ namespace LC_Sharp {
 		public string[] source;
 		public int line;
 		public short pc;
-		public void Print(string message) => Console.WriteLine(message);
-		public void Directive(string line) {
-			switch (line.Split(new[] { ' ' }, 1)[0]) {
-				case ".FILL":
-
-					break;
-			}
-			short Fill(string code) {
-				if (code.StartsWith("b")) {
-					short result = 0;
-					foreach (char digit in code.Skip(1)) {
-						if (digit == '1') {
-							result++;
-						} else if (digit != '0') {
-							Error($"Invalid binary digit {code}");
-						}
-						result <<= 1;
-					}
-					return result;
-				} else if (code.StartsWith("#")) {
-					return short.Parse(code.Substring(1));
-				} else if (code.StartsWith("X")) {
-					return short.Parse(code, System.Globalization.NumberStyles.HexNumber);
-				} else if (code.StartsWith("'")) {
-					if (code.Length == 3) {
-						return (short)code[1];
-					} else {
-						Error($"Invalid character literal {code}");
-					}
-				}
-				return 0;
-			}
+		public AssemblerContext() {
+			labels = new Dictionary<string, short>();
+			labelsReverse = new Dictionary<short, string>();
+			source = new string[0];
+			line = 0;
+			pc = 0x3000;
 		}
+		public void Print(string message) => Console.WriteLine(message);
 		//Calculates the PC-offset from the given label and verifies that it fits within a given size
 		public short Offset(string label, int size) {
 			short mask = (short)(0xFFFF >> (16 - size));    //All ones
@@ -463,7 +519,7 @@ namespace LC_Sharp {
 			return false;
 		}
 		public void Error(string message) {
-			throw new Exception($"Line {line}: {message} in {source[line]}");
+			throw new Exception($"Line {line}: {message} in {source?[line] ?? "code"}");
 		}
 		public void PrintLabels() {
 			labels.Keys.ToList().ForEach(label => Console.WriteLine($"{labels[label]} => {label}"));
@@ -487,7 +543,7 @@ namespace LC_Sharp {
 			int min = -(1 << (size - 1));
 			if (result > max) {
 				Error($"Immediate value underflows {size}-bit signed integer");
-			} else if (result < max) {
+			} else if (result < min) {
 				Error($"Immediate value overflows {size}-bit signed integer");
 			}
 			return true;
@@ -516,6 +572,10 @@ namespace LC_Sharp {
 		public string name { get; private set; }
 		public short code => (short)(0b1111000000000000 | vector);
 		public short vector;
+		public Trap(string name, short vector) {
+			this.name = name;
+			this.vector = vector;
+		}
 		public short Assemble(AssemblerContext context, string instruction) {
 			return code;
 		}
@@ -648,7 +708,7 @@ namespace LC_Sharp {
 							if ((instruction & (1 << bitIndex)) != 0) {
 								bitIndex -= 5;
 								short imm5 = ((short) ((instruction >> bitIndex) & 0b11111)).signExtend(16);
-								args.Add($"#imm5.ToString()");
+								args.Add($"#{imm5.ToString()}");
 							} else {
 								bitIndex -= 2;
 								args.Add($"R{(instruction >> bitIndex) & 0b111}");
@@ -662,7 +722,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(dest.ToString());
+								args.Add(offset9.ToString());
 							}
 							break;
 						}
@@ -673,7 +733,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(dest.ToString());
+								args.Add(offset6.ToString());
 							}
 							break;
 						}
@@ -684,7 +744,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(dest.ToString());
+								args.Add(offset11.ToString());
 							}
 							break;
 						}

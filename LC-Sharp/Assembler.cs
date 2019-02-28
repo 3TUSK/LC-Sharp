@@ -97,11 +97,11 @@ namespace LC_Sharp
     public class StandardInstructionAssembler : IInstructionAssembler
     {
         // TODO (3TUSK): Get rid of that strange instruction assembler hierarchy by using standardized token system (see below StandardOperands)
-        ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
+        public ushort Assemble(string sourceInstruction, ushort offset, ParsedFile environment)
         {
             throw new Exception("Not implemented yet");
         }
-        string Disassemble(ushort instruction)
+        public string Disassemble(ushort instruction)
         {
             throw new Exception("Not implemented yet");
         }
