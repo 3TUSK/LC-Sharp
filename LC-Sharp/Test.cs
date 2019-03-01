@@ -1,4 +1,3 @@
-using System.Globalization;
 using NUnit.Framework;
 
 namespace LC_Sharp
@@ -21,11 +20,11 @@ namespace LC_Sharp
                     "HALT"
                 };
                 var assembled = new NeoAssembler(new Parser().Parse(source)).Assemble();
-                Assert.Equals(assembled[0], ushort.Parse("102A", NumberStyles.HexNumber));
-                Assert.Equals(assembled[1], ushort.Parse("927F", NumberStyles.HexNumber));
-                Assert.Equals(assembled[2], ushort.Parse("5420", NumberStyles.HexNumber));
-                Assert.Equals(assembled[3], ushort.Parse("F021", NumberStyles.HexNumber));
-                Assert.Equals(assembled[4], ushort.Parse("F025", NumberStyles.HexNumber));
+                Assert.Equals(assembled[0], 0x102A);
+                Assert.Equals(assembled[1], 0x927F);
+                Assert.Equals(assembled[2], 0x5420);
+                Assert.Equals(assembled[3], 0xF021);
+                Assert.Equals(assembled[4], 0xF025);
             }
         }    
     }
