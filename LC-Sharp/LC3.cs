@@ -270,7 +270,35 @@ namespace LC_Sharp {
     public class Assembler {
         LC3 lc3;
 		AssemblerContext context;
-        public Assembler(LC3 lc3) {
+		OpLookup ops = new OpLookup(
+			new Instruction("BR", 0, new[] { Operands.b000, Operands.LabelOffset9 }),
+			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
+			new Instruction("LD", 2, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("ST", 3, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("JSR", 4, new[] { Operands.b1, Operands.LabelOffset11 }),
+			new Instruction("JSRR", 4, new[] { Operands.b000, Operands.Reg }),
+			new Instruction("AND", 5, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
+			new Instruction("LDR", 6, new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 }),
+			new Instruction("STR", 7, new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 }),
+			new Instruction("RTI", 8),
+			new Instruction("NOT", 9, new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1 }),
+			new Instruction("LDI", 10, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("STI", 11, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("JMP", 12, new[] { Operands.b000, Operands.Reg }),
+			new Instruction("RET", 12, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
+			new Instruction("RESERVED", 13),
+			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("TRAP", 15),
+			new Trap("GETC", 0x20),
+			new Trap("OUT", 0x21),
+			new Trap("PUTS", 0x22),
+			new Trap("IN", 0x23),
+			new Trap("PUTSP", 0x24),
+			new Trap("HALT", 0x25),
+			new Trap("CUSTOM", 0x26)
+		);
+
+		public Assembler(LC3 lc3) {
             this.lc3 = lc3;
 			context = new AssemblerContext();
         }
@@ -330,6 +358,9 @@ namespace LC_Sharp {
 						context.pc++;
 					}
 					break;
+				case ".BREAK":
+
+					break;
 				case ".FILL":
 					lc3.memory.Write((short) (context.pc - 1), Fill(parts[1]));
 					context.pc++;
@@ -350,6 +381,9 @@ namespace LC_Sharp {
 						lc3.memory.Write((short)(context.pc - 1), 0);
 						context.pc++;
 					}
+					break;
+				case ".TRAP":
+
 					break;
 			}
 			short Fill(string code) {
@@ -427,32 +461,6 @@ namespace LC_Sharp {
 			context.Print($"Assembled {opname}");
 			return true;
 		}
-		OpLookup ops = new OpLookup(
-			new Instruction("BR", 0, new[] { Operands.b000, Operands.LabelOffset9 }),
-			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
-			new Instruction("LD", 2, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("ST", 3, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("JSR", 4, new[] { Operands.b1, Operands.LabelOffset11 }),
-			new Instruction("JSRR", 4, new[] { Operands.b000, Operands.Reg }),
-			new Instruction("AND", 5, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
-			new Instruction("LDR", 6, new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 }),
-			new Instruction("STR", 7, new[] { Operands.Reg, Operands.Reg, Operands.LabelOffset6 }),
-			new Instruction("RTI", 8),
-			new Instruction("NOT", 9, new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1 }),
-			new Instruction("LDI", 10, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("STI", 11, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("JMP", 12, new[] { Operands.b000, Operands.Reg }),
-			new Instruction("RET", 12, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
-			new Instruction("RESERVED", 13),
-			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("TRAP", 15),
-			new Trap("GETC", 0x20),
-			new Trap("OUT", 0x21),
-			new Trap("PUTS", 0x22),
-			new Trap("IN", 0x23),
-			new Trap("PUTSP", 24),
-			new Trap("HALT", 0x25)
-		);
 	};
 	class OpLookup {
 		List<Op> ops;
