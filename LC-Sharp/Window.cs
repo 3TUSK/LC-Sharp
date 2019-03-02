@@ -31,6 +31,7 @@ namespace LC_Sharp {
 			lc3 = new LC3();
 			assembly = new Assembler(lc3);
 			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
+			Console.ReadLine();
 			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
             instructions = new ScrollView(new Rect(0, 0, 30, 40), new Rect(0, 0, 30, 0xFFFF));

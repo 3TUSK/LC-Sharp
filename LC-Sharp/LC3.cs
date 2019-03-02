@@ -294,7 +294,7 @@ namespace LC_Sharp {
 			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
 			new Instruction("TRAP", 15)
 		);
-		short trapVectorIndex = 0x20;
+		short trapVectorIndex = 0x0020;
 
 		public Assembler(LC3 lc3) {
 			this.lc3 = lc3;
@@ -355,6 +355,9 @@ namespace LC_Sharp {
 			if (string.IsNullOrEmpty(line)) {
 				context.lineIndex++;
 				return;
+			} else if (line.StartsWith(".")) {
+				//Period marks a directive
+				Directive(line);
 			} else if (InstructionPass(line, out InstructionPass passed)) {
 				//If this names an instruction, we treat it like one
 				//Check if we have to do a second pass for this instruction. Otherwise, we assemble it now.
@@ -366,9 +369,6 @@ namespace LC_Sharp {
 				}
 				context.pc++;
 				context.lineIndex++;
-			} else if (line.StartsWith(".")) {
-				//Period marks a directive
-				Directive(line);
 			} else {
 				var a = context.labels.LastOrDefault();
 
@@ -380,6 +380,7 @@ namespace LC_Sharp {
 				}
 				//This line starts with a label, but we can have a directive or op right after
 				context.Label(label);
+				context.Print($"Line {context.lineIndex}: Labeled {label}");
 				labeled = true;
 				line = parts.Length == 1 ? "" : parts[1].Trim();
 				goto Parse;
@@ -403,9 +404,17 @@ namespace LC_Sharp {
 		}
 		public string Dissemble(short pc, short instruction) {
 			context.pc = pc;
+
+			//This might be a FILLED value, but we can't tell
+			if (context.Lookup((short) (pc - 1), out string label))
+				return label;
+
 			//For TRAP Subroutines, we consider their entire code to be an opcode
 			if ((instruction & 0xF000) == 0xF000) {
-				return ops.Code(instruction).Dissemble(context, instruction);
+				var s = Convert.ToString(instruction, 2);
+				if(ops.TryCode(instruction, out Op result))
+					return result.Dissemble(context, instruction);
+				return instruction.ToRegisterString();
 			} else if ((instruction & 0xFE00) == 0) {
 				return "NOP";
 			} else {
@@ -439,9 +448,11 @@ namespace LC_Sharp {
 					break;
 				case ".ORIG":
 					string orig = parts[1];
+
 					if(!orig.StartsWith("X", true, null)) {
 						context.Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
 					}
+					context.Print($"Line {context.lineIndex}: ORIG {orig}");
 					orig = orig.Substring(1);
 					context.pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
 					context.lineIndex++;
@@ -464,6 +475,7 @@ namespace LC_Sharp {
 
 					//The operand is the name of the TRAP Subroutine
 					string name = parts[1];
+					context.Print($"Line {context.lineIndex}: TRAP {name}");
 					ops.Add(new Trap(name, trapVectorIndex));
 					
 					//Increment the TRAP vector index
@@ -552,7 +564,7 @@ namespace LC_Sharp {
 		public bool InstructionPass(string instruction, out InstructionPass passed) {
 			passed = null;
 			string opname = instruction.Split(new[] { ' ', '\r', '\n', '\t' }, 2)[0];
-			context.Print($"Op: {opname}");
+			//context.Print($"Op: {opname}");
 			switch (opname) {
 				case var br when br.StartsWith("BR"): {
 						//BRnzp has complicated syntax so we evaluate it here
@@ -599,13 +611,13 @@ namespace LC_Sharp {
 
 							passed = new InstructionPass(context, op, instruction);
 						} else {
-							context.Print($"Unknown instruction: {opname}");
+							//context.Print($"Unknown instruction: {opname}");
 							return false;
 						}
 						break;
 					}
 			}
-			context.Print($"Pre-Assembled {opname}");
+			context.Print($"Line {context.lineIndex}: Pre-Assembled {opname}");
 			return true;
 		}
 	};
@@ -761,13 +773,12 @@ namespace LC_Sharp {
 	}
 	public class Trap : Op {
 		public string name { get; private set; }
-		public short code => (short)(0b1111000000000000 | vector);
+		public short code { get; private set; }
 		public bool twoPass => false;
-		public short vector;
 		public int operandCount => 0;
 		public Trap(string name, short vector) {
 			this.name = name;
-			this.vector = vector;
+			code = (short)(0xF000 | vector);
 		}
 		public short Assemble(AssemblerContext context, string instruction) {
 			return code;
@@ -960,7 +971,7 @@ namespace LC_Sharp {
 						}
 				}
 			}
-			return string.Join(" ", args);
+			return string.Join(" ", args.Select(s => s.PadRight(4)));
 	}
 	}
 }
