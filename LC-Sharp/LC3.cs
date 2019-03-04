@@ -972,6 +972,137 @@ namespace LC_Sharp {
 				}
 			}
 			return string.Join(" ", args.Select(s => s.PadRight(4)));
+		}
 	}
+	public class Reader {
+		string source;
+		
+		int index;
+
+		int line;
+		int column;
+		
+		public Reader(string source) {
+			index = 0;
+			line = 0;
+			column = 0;
+		}
+		public TokenType Read(out string token) {
+			Read:
+			if (index == source.Length) {
+				token = "";
+				return TokenType.End;
+			}
+			switch (source[index]) {
+				case ' ':
+					ProcessChar();
+					goto Read;
+				case '\t':
+					ProcessChar();
+					ProcessChar();
+					ProcessChar();
+					ProcessChar();
+					goto Read;
+				case '\n':
+					ProcessNewline();
+					goto Read;
+				case '\r':
+					ProcessChar();
+					goto Read;
+				case '.':
+					token = ReadSubstring();
+					return TokenType.Directive;
+				case ';':
+					token = ReadSubstring();
+					return TokenType.Comment;
+				case '"':
+					ProcessChar();
+					token = ReadQuoted();
+					return TokenType.String;
+				case ',':
+					ProcessChar();
+					token = ",";
+					return TokenType.Comma;
+				default:
+					token = ReadSubstring();
+					return TokenType.Symbol;
+			}
+		}
+		string ReadQuoted() {
+			string result = "";
+			Read:
+			if (index == source.Length) {
+				throw new Exception($"[{line}, {column}] Missing close quote: {result}");
+			}
+			switch (source[index]) {
+				case '\r':
+				case '\n':
+					throw new Exception($"[{line}, {column}] Missing close quote: {result}");
+				case '"':
+					ProcessChar();
+					return result;
+				default:
+					ProcessChar();
+					result += source[index];
+					goto Read;
+			}
+		}
+		string ReadSubstring() {
+			string result = "";
+			Read:
+			if(index == source.Length) {
+				return result;
+			}
+			switch(source[index]) {
+				case ' ':
+				case '\t':
+				case '\r':
+				case '\n':
+					return result;
+				default:
+					ProcessChar();
+					result += source[index];
+					goto Read;
+			}
+		}
+		string ReadLine() {
+			string result = "";
+			Read:
+			if (index == source.Length) {
+				return result;
+			}
+			switch (source[index]) {
+				case '\r':
+				case '\n':
+					return result;
+				case '\t':
+					ProcessChar();
+					ProcessChar();
+					ProcessChar();
+					ProcessChar();
+					goto Read;
+				default:
+					ProcessChar();
+					result += source[index];
+					goto Read;
+			}
+		}
+		void ProcessChar() {
+			index++;
+			column++;
+		}
+		void ProcessNewline() {
+			index++;
+			line++;
+			column = 0;
+		}
+	}
+	public enum TokenType {
+		Symbol,
+		String,
+		Comma,
+		Directive,
+		Comment,
+		End
 	}
 }
