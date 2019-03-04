@@ -272,8 +272,13 @@ namespace LC_Sharp {
 
 	public class Assembler {
 		LC3 lc3;
-		AssemblerContext context;
+		Reader reader;
+		public short pc { get; private set; }
+		public int index => reader.index;
+
 		public List<InstructionPass> secondPass;
+		public Dictionary<string, short> labels { get; private set; } //labels
+		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
 		OpLookup ops = new OpLookup(
 			new Instruction("BR", 0, new[] { Operands.b000, Operands.LabelOffset9 }),
 			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
@@ -298,13 +303,14 @@ namespace LC_Sharp {
 
 		public Assembler(LC3 lc3) {
 			this.lc3 = lc3;
-			context = new AssemblerContext();
+			pc = lc3.control.pc;
+			reader = new Reader("");
 			secondPass = new List<InstructionPass>();
 		}
 		//Assemble the given lines as new source to an existing program
 		public void AssembleToPC(params string[] lines) {
-			context.pc = lc3.control.pc;
-			context.pc++;
+			pc = lc3.control.pc;
+			pc++;
 			AssembleLines(lines);
 		}
 		public string DissembleToPC() {
@@ -315,110 +321,48 @@ namespace LC_Sharp {
 		}
 
 		public void AssembleLines(params string[] lines) {
-			context.lineIndex = 0;
-			context.source = lines;
+			reader = new Reader(string.Join("\n", lines));
 			secondPass.Clear();
-			//First Pass
-			foreach(var line in lines) {
-				FirstPass(line);
-			}
+			FirstPass();
 			SecondPass();
 		}
-		public void FirstPass(string line) {
-			line = line.Trim();
-
-			bool apostrophe = false;
-			bool quote = false;
-			string code = new string(line.TakeWhile(c => {
-				if (c == '"') {
-					if(quote) {
-						apostrophe = false;
-						quote = false;
-					} else {
-						quote = true;
-					}
-				} else if(c == '\'') {
-					if (apostrophe)
-						apostrophe = false;
-					else
-						apostrophe = true;
-				}
-				return (c != ';' || apostrophe || quote);
-			}).ToArray());
-			string comment = line.Substring(code.Length);
-
-
-			line = code;
-
-			bool labeled = false;
-			Parse:
-			if (string.IsNullOrEmpty(line)) {
-				context.lineIndex++;
-				return;
-			} else if (line.StartsWith(".")) {
-				//Period marks a directive
-				Directive(line);
-			} else if (InstructionPass(line, out InstructionPass passed)) {
-				//If this names an instruction, we treat it like one
-				//Check if we have to do a second pass for this instruction. Otherwise, we assemble it now.
-				if(passed.op.twoPass) {
-					secondPass.Add(passed);
-				} else {
-					//We don't need a second pass so assemble it
-					lc3.memory.Write((short) (context.pc - 1), passed.Assemble(context));
-				}
-				context.pc++;
-				context.lineIndex++;
-			} else {
-				var a = context.labels.LastOrDefault();
-
-				var parts = line.Split(new[] { ' ', '\r', '\n', '\t' }, 2);
-				var label = parts[0];
-				if (labeled) {
-					//To do: what to do if we have two labels in a row?
-					throw new Exception($"Unidentified token {label}");
-				}
-				//This line starts with a label, but we can have a directive or op right after
-				context.Label(label);
-				context.Print($"Line {context.lineIndex}: Labeled {label}");
-				labeled = true;
-				line = parts.Length == 1 ? "" : parts[1].Trim();
-				goto Parse;
-			}
+		public void FirstPass() {
+			
+			
 		}
 		public void SecondPass() {
-			short pc = context.pc;
-			int lineIndex = context.lineIndex;
+			short pc = this.pc;
+			int index = reader.index;
 			//Second Pass
 			foreach (var pass in secondPass) {
-				context.pc = pass.pc;
-				context.lineIndex = pass.line;
+				pc = pass.pc;
+				reader.index = pass.index;
 				var i = pass.instruction;
-				lc3.memory.Write((short)(context.pc - 1), pass.Assemble(context));
+				lc3.memory.Write((short)(pc - 1), pass.Assemble(this));
 			}
-			context.pc = pc;
-			context.lineIndex = lineIndex;
+			this.pc = pc;
+			reader.index = index;
 			//Remember to clear secondPass.
 			//There was a bug where second passes from future .ENDs would attempt to recompile old instruction passes
 			secondPass.Clear();
 		}
 		public string Dissemble(short pc, short instruction) {
-			context.pc = pc;
+			this.pc = pc;
 
 			//This might be a FILLED value, but we can't tell
-			if (context.Lookup((short) (pc - 1), out string label))
+			if (Lookup((short) (pc - 1), out string label))
 				return label;
 
 			//For TRAP Subroutines, we consider their entire code to be an opcode
 			if ((instruction & 0xF000) == 0xF000) {
 				var s = Convert.ToString(instruction, 2);
 				if(ops.TryCode(instruction, out Op result))
-					return result.Dissemble(context, instruction);
+					return result.Dissemble(this, instruction);
 				return instruction.ToRegisterString();
 			} else if ((instruction & 0xFE00) == 0) {
 				return "NOP";
 			} else {
-				return ops.Code((short)((instruction & 0xF000) >> 12)).Dissemble(context, instruction);
+				return ops.Code((short)((instruction & 0xF000) >> 12)).Dissemble(this, instruction);
 			}
 		}
 		public void Directive(string line) {
@@ -427,60 +371,53 @@ namespace LC_Sharp {
 				case ".BLKW":
 					short length = short.Parse(parts[1]);
 					for (int i = 0; i < length; i++) {
-						context.pc++;
+						pc++;
 					}
-					context.lineIndex++;
 					break;
 				case ".BREAK":
-
-					context.lineIndex++;
 					break;
 				case ".FILL":
-					lc3.memory.Write((short)(context.pc - 1), Fill(parts[1]));
-					context.pc++;
-					context.lineIndex++;
+					lc3.memory.Write((short)(pc - 1), Fill(parts[1]));
+					pc++;
 					break;
 				case ".END":
 					//End of file, indicates that we should second-pass and clear out labels now
 					SecondPass();
-					context.ClearLabels();
-					context.lineIndex++;
+					ClearLabels();
 					break;
 				case ".ORIG":
 					string orig = parts[1];
 
 					if(!orig.StartsWith("X", true, null)) {
-						context.Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
+						Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
 					}
-					context.Print($"Line {context.lineIndex}: ORIG {orig}");
+					Print($"Line {reader.line}: ORIG {orig}");
+
 					orig = orig.Substring(1);
-					context.pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
-					context.lineIndex++;
+					pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
 					break;
 				case ".STRINGZ":
 					string s = parts[1];
 					if (s.StartsWith("\"") && s.EndsWith("\"")) {
 						for (int i = 1; i < s.Length - 1; i++) {
-							lc3.memory.Write((short)(context.pc - 1), (short)s[i]);
-							context.pc++;
+							lc3.memory.Write((short)(pc - 1), (short)s[i]);
+							pc++;
 						}
-						lc3.memory.Write((short)(context.pc - 1), 0);
-						context.pc++;
+						lc3.memory.Write((short)(pc - 1), 0);
+						pc++;
 					}
-					context.lineIndex++;
 					break;
 				case ".TRAP":
 					//Write the current location to the TRAP vector table
-					lc3.memory.Write(trapVectorIndex, (short) (context.pc - 1));
+					lc3.memory.Write(trapVectorIndex, (short) (pc - 1));
 
 					//The operand is the name of the TRAP Subroutine
 					string name = parts[1];
-					context.Print($"Line {context.lineIndex}: TRAP {name}");
+					Print($"Line {reader.line}: TRAP {name}");
 					ops.Add(new Trap(name, trapVectorIndex));
 					
 					//Increment the TRAP vector index
 					trapVectorIndex++;
-					context.lineIndex++;
 					break;
 			}
 			short Fill(string code) {
@@ -490,7 +427,7 @@ namespace LC_Sharp {
 						if (digit == '1') {
 							result++;
 						} else if (digit != '0') {
-							context.Error($"Invalid binary digit {code}");
+							Error($"Invalid binary digit {code}");
 						}
 						result <<= 1;
 					}
@@ -503,7 +440,7 @@ namespace LC_Sharp {
 					if (code.Length == 3) {
 						return (short)code[1];
 					} else {
-						context.Error($"Invalid character literal {code}");
+						Error($"Invalid character literal {code}");
 					}
 				}
 				return 0;
@@ -573,21 +510,21 @@ namespace LC_Sharp {
 							switch (c) {
 								case 'n':
 									if (n) {
-										context.Error($"Repeated condition code 'n'");
+										Error($"Repeated condition code 'n'");
 									} else {
 										n = true;
 									}
 									break;
 								case 'z':
 									if (z) {
-										context.Error($"Repeated condition code 'z'");
+										Error($"Repeated condition code 'z'");
 									} else {
 										z = true;
 									}
 									break;
 								case 'p':
 									if (p) {
-										context.Error($"Repeated condition code 'p'");
+										Error($"Repeated condition code 'p'");
 									} else {
 										p = true;
 									}
@@ -595,7 +532,7 @@ namespace LC_Sharp {
 							}
 						}
 						short precode = (short)((n ? 0x0800 : 0) | (z ? 0x0400 : 0) | (p ? 0x0200 : 0));
-						passed = new InstructionPass(context, ops.Name("BR"), instruction, precode);
+						passed = new InstructionPass(this, ops.Name("BR"), instruction, precode);
 						break;
 					}
 				default: {
@@ -605,11 +542,11 @@ namespace LC_Sharp {
 							IEnumerable<string> args = instruction.Split(' ', '\r', '\n', '\t');
 							args = string.Join("", args.Skip(1)).Split(',').Where(s => !string.IsNullOrEmpty(s));
 							if(op.operandCount != args.Count()) {
-								context.Error($"Op {opname} requires exactly {op.operandCount} operands");
+								Error($"Op {opname} requires exactly {op.operandCount} operands");
 							}
 
 
-							passed = new InstructionPass(context, op, instruction);
+							passed = new InstructionPass(this, op, instruction);
 						} else {
 							//context.Print($"Unknown instruction: {opname}");
 							return false;
@@ -617,69 +554,29 @@ namespace LC_Sharp {
 						break;
 					}
 			}
-			context.Print($"Line {context.lineIndex}: Pre-Assembled {opname}");
+			Print($"Line {reader.line}: Pre-Assembled {opname}");
 			return true;
 		}
-	};
-	class OpLookup {
-		List<Op> ops;
-		Dictionary<string, Op> byName;
-		Dictionary<short, Op> byCode;
-		public OpLookup(params Op[] opset) {
-			ops = new List<Op>();
-			byName = new Dictionary<string, Op>();
-			byCode = new Dictionary<short, Op>();
-			foreach (Op op in opset) {
-				Add(op);
-			}
-		}
-		public void Add(Op op) {
-			ops.Add(op);
-			byName[op.name] = op;
-			byCode[op.code] = op;
-		}
-		public bool TryName(string name, out Op result) => byName.TryGetValue(name, out result);
-		public bool TryCode(short code, out Op result) => byCode.TryGetValue(code, out result);
-		public Op Name(string name) => byName[name];
-		public Op Code(short code) => byCode[code];
-	}
-	public class AssemblerContext {
-		public Dictionary<string, short> labels { get; private set; } //labels
-		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
-		public string[] source;
-		public int lineIndex;
-		public short pc;
-		public AssemblerContext() {
-			labels = new Dictionary<string, short>();
-			labelsReverse = new Dictionary<short, string>();
-			source = new string[0];
-			lineIndex = 0;
-			pc = 0x3000;
-		}
-		public AssemblerContext localContext() => new AssemblerContext() {
-			labels = labels,                //Pass by reference, so it updates with our map
-			labelsReverse = labelsReverse,  //Pass by reference, so it updates with our map
-			source = source,                //Pass by reference, but we don't set any values by index
-			lineIndex = lineIndex,                    //Pass by value, so it doesn't change
-			pc = pc                         //Pass by value, so it doesn't change
-		};
+
+
 		public void ClearLabels() {
 			labels.Clear();
 			labelsReverse.Clear();
 		}
+
 		public void Print(string message) => Console.WriteLine(message);
 		//Calculates the PC-offset from the given label and verifies that it fits within a given size
 		public short Offset(string label, int size) {
 			ushort mask = (ushort)(0xFFFF >> (16 - size));    //All ones
 			short min = (short)-(1 << (size - 1));           //Highest negative number, same as the MSB
-															//short max = (short)(0xEFFF >> (16 - size));
+															 //short max = (short)(0xEFFF >> (16 - size));
 			short max = (short)(-min - 1);                //Highest positive number, All ones except MSB
 
 			if (labels.TryGetValue(label, out short destination)) {
 				short offset = (short)(destination - pc);
 				//Size range check
 				if (offset < min || offset > max) {
-					Error($"Offset at '{label}' overflows signed {size}-bit integer in {source[lineIndex]}");
+					Error($"Offset at '{label}' overflows signed {size}-bit integer");
 				} else {
 					//Truncate the result to the given size
 					return (short)(offset & mask);
@@ -701,14 +598,14 @@ namespace LC_Sharp {
 			return false;
 		}
 		public void Error(string message) {
-			throw new Exception($"Line {lineIndex}: {message} in {source?[lineIndex] ?? "code"}");
+			throw new Exception(reader.GetContextString(message));
 		}
 		public void PrintLabels() {
 			labels.Keys.ToList().ForEach(label => Console.WriteLine($"{labels[label]} => {label}"));
 		}
 		//Create a label at the current line
 		public void Label(string label) {
-			short location = (short) (pc - 1);
+			short location = (short)(pc - 1);
 			labels[label] = location;
 			labelsReverse[location] = label;
 		}
@@ -733,6 +630,28 @@ namespace LC_Sharp {
 		public bool Lookup(short address, out string label) {
 			return labelsReverse.TryGetValue(address, out label);
 		}
+	};
+	class OpLookup {
+		List<Op> ops;
+		Dictionary<string, Op> byName;
+		Dictionary<short, Op> byCode;
+		public OpLookup(params Op[] opset) {
+			ops = new List<Op>();
+			byName = new Dictionary<string, Op>();
+			byCode = new Dictionary<short, Op>();
+			foreach (Op op in opset) {
+				Add(op);
+			}
+		}
+		public void Add(Op op) {
+			ops.Add(op);
+			byName[op.name] = op;
+			byCode[op.code] = op;
+		}
+		public bool TryName(string name, out Op result) => byName.TryGetValue(name, out result);
+		public bool TryCode(short code, out Op result) => byCode.TryGetValue(code, out result);
+		public Op Name(string name) => byName[name];
+		public Op Code(short code) => byCode[code];
 	}
 	public enum Operands {
 		Reg,                //Size 3, a register
@@ -748,18 +667,18 @@ namespace LC_Sharp {
 	public class InstructionPass {
 		//Stores info for assembling an instruction in the second pass
 		public short pc { get; private set; }
-		public int line { get; private set; }
+		public int index { get; private set; }
 		public short precode { get; private set; }
 		public Op op { get; private set; }
 		public string instruction { get; private set; }
-		public InstructionPass(AssemblerContext context, Op op, string instruction, short precode = 0) {
+		public InstructionPass(Assembler context, Op op, string instruction, short precode = 0) {
 			pc = context.pc;
-			line = context.lineIndex;
+			index = context.index;
 			this.precode = precode;
 			this.op = op;
 			this.instruction = instruction;
 		}
-		public short Assemble(AssemblerContext context) {
+		public short Assemble(Assembler context) {
 			return (short) (precode | op.Assemble(context, instruction));
 		}
 	}
@@ -768,8 +687,8 @@ namespace LC_Sharp {
 		short code { get; }
 		bool twoPass { get; }
 		int operandCount { get; }
-		short Assemble(AssemblerContext context, string instruction);
-		string Dissemble(AssemblerContext context, short instruction);
+		short Assemble(Assembler context, string instruction);
+		string Dissemble(Assembler context, short instruction);
 	}
 	public class Trap : Op {
 		public string name { get; private set; }
@@ -780,10 +699,10 @@ namespace LC_Sharp {
 			this.name = name;
 			code = (short)(0xF000 | vector);
 		}
-		public short Assemble(AssemblerContext context, string instruction) {
+		public short Assemble(Assembler context, string instruction) {
 			return code;
 		}
-		public string Dissemble(AssemblerContext context, short instruction) {
+		public string Dissemble(Assembler context, short instruction) {
 			return name;
 		}
 	}
@@ -798,7 +717,7 @@ namespace LC_Sharp {
 			this.code = code;
 			this.operands = operands;
 		}
-		public short Assemble(AssemblerContext context, string instruction) {
+		public short Assemble(Assembler context, string instruction) {
 			short bitIndex = 12;
 			short result = 0;
 			string[] args = instruction.Split(' ', '\r', '\n', '\t');
@@ -894,7 +813,7 @@ namespace LC_Sharp {
 			}
 			return result;
 		}
-		public string Dissemble(AssemblerContext context, short instruction) {
+		public string Dissemble(Assembler context, short instruction) {
 			short bitIndex = 12;
 			List<string> args = new List<string> { name };
 			foreach (Operands operand in operands) {
@@ -976,16 +895,30 @@ namespace LC_Sharp {
 	}
 	public class Reader {
 		string source;
-		
-		int index;
 
-		int line;
-		int column;
+		private int _index;
+		public int index {
+			get => _index;
+			set {
+				_index = value;
+				line = source.Take(index).Count(c => c == '\n');
+				column = index - source.LastIndexOf('\n', index);
+			}
+		}
+
+		public int line;
+		public int column;
 		
 		public Reader(string source) {
 			index = 0;
 			line = 0;
 			column = 0;
+		}
+		public string GetContextString(string message) {
+			return $"[{line}, {column}] {message} in {GetCurrentLine()}";
+		}
+		public string GetCurrentLine() {
+			return source.Substring(source.LastIndexOf('\n', index - 1), source.Length - index);
 		}
 		public TokenType Read(out string token) {
 			Read:
