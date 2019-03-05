@@ -279,6 +279,8 @@ namespace LC_Sharp {
 		public List<InstructionPass> secondPass;
 		public Dictionary<string, short> labels { get; private set; } //labels
 		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
+		public Dictionary<string, short> trapVectorTable { get; private set; }
+		Func<string, short, Instruction> br = (string name, short code) => new Instruction(name, 0, new[] { Operands.b000, Operands.LabelOffset9 });
 		OpLookup ops = new OpLookup(
 			new Instruction("BR", 0, new[] { Operands.b000, Operands.LabelOffset9 }),
 			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
@@ -327,8 +329,56 @@ namespace LC_Sharp {
 			SecondPass();
 		}
 		public void FirstPass() {
+			switch(reader.Read(out string token)) {
+				case TokenType.Symbol:
+
+					break;
+				case TokenType.Comma:
+
+					break;
+			}
 			
+		}
+		private void TryInstruction(string symbol) {
 			
+			Read:
+			switch(reader.Read(out string second)) {
+				case TokenType.Symbol:
+					
+					break;
+				case TokenType.Directive:
+					//A label for a directive
+					Label(symbol);
+					Directive(second);
+					break;
+				case TokenType.Comma:
+					//Unexpected
+					Error("Unexpected Comma");
+					break;
+				case TokenType.Comment:
+					//Skip and record
+					goto Read;
+				case TokenType.End:
+					//Last instruction or label
+					if(InstructionPass(symbol, new string[0], out InstructionPass passed)) {
+						secondPass.Add(passed);
+					} else {
+						Label(symbol);
+					}
+					break;
+			}
+		}
+		private List<string> TryArgs(string first) {
+			List<string> args = new List<string> { first };
+			Read:
+			switch(reader.Read(out string token)) {
+				case TokenType.Symbol:
+					//If we have a third symbol with no comma before it, then this is probably our only argument
+					break;
+				case TokenType.Comment:
+					goto Read;
+					case TokenType.
+			}
 		}
 		public void SecondPass() {
 			short pc = this.pc;
@@ -337,7 +387,7 @@ namespace LC_Sharp {
 			foreach (var pass in secondPass) {
 				pc = pass.pc;
 				reader.index = pass.index;
-				var i = pass.instruction;
+				var i = pass.args;
 				lc3.memory.Write((short)(pc - 1), pass.Assemble(this));
 			}
 			this.pc = pc;
@@ -365,9 +415,8 @@ namespace LC_Sharp {
 				return ops.Code((short)((instruction & 0xF000) >> 12)).Dissemble(this, instruction);
 			}
 		}
-		public void Directive(string line) {
-			string[] parts = line.Split(new[] { ' ' }, 2);
-			switch (parts[0]) {
+		public void Directive(string directive) {
+			switch (directive) {
 				case ".BLKW":
 					short length = short.Parse(parts[1]);
 					for (int i = 0; i < length; i++) {
@@ -498,9 +547,8 @@ namespace LC_Sharp {
 			return true;
 		}
 		*/
-		public bool InstructionPass(string instruction, out InstructionPass passed) {
+		public bool InstructionPass(string opname, string[] args, out InstructionPass passed) {
 			passed = null;
-			string opname = instruction.Split(new[] { ' ', '\r', '\n', '\t' }, 2)[0];
 			//context.Print($"Op: {opname}");
 			switch (opname) {
 				case var br when br.StartsWith("BR"): {
@@ -532,21 +580,19 @@ namespace LC_Sharp {
 							}
 						}
 						short precode = (short)((n ? 0x0800 : 0) | (z ? 0x0400 : 0) | (p ? 0x0200 : 0));
-						passed = new InstructionPass(this, ops.Name("BR"), instruction, precode);
+						passed = new InstructionPass(this, ops.Name("BR"), args, precode);
 						break;
 					}
 				default: {
 						if (ops.TryName(opname, out Op op)) {
 
 							//To do: Check the number of operands
-							IEnumerable<string> args = instruction.Split(' ', '\r', '\n', '\t');
-							args = string.Join("", args.Skip(1)).Split(',').Where(s => !string.IsNullOrEmpty(s));
 							if(op.operandCount != args.Count()) {
 								Error($"Op {opname} requires exactly {op.operandCount} operands");
 							}
 
 
-							passed = new InstructionPass(this, op, instruction);
+							passed = new InstructionPass(this, op, args);
 						} else {
 							//context.Print($"Unknown instruction: {opname}");
 							return false;
@@ -670,16 +716,16 @@ namespace LC_Sharp {
 		public int index { get; private set; }
 		public short precode { get; private set; }
 		public Op op { get; private set; }
-		public string instruction { get; private set; }
-		public InstructionPass(Assembler context, Op op, string instruction, short precode = 0) {
+		public string[] args { get; private set; }
+		public InstructionPass(Assembler context, Op op, string[] args, short precode = 0) {
 			pc = context.pc;
 			index = context.index;
 			this.precode = precode;
 			this.op = op;
-			this.instruction = instruction;
+			this.args = args;
 		}
 		public short Assemble(Assembler context) {
-			return (short) (precode | op.Assemble(context, instruction));
+			return (short) (precode | op.Assemble(context, args));
 		}
 	}
 	public interface Op {
@@ -687,7 +733,7 @@ namespace LC_Sharp {
 		short code { get; }
 		bool twoPass { get; }
 		int operandCount { get; }
-		short Assemble(Assembler context, string instruction);
+		short Assemble(Assembler context, string[] args);
 		string Dissemble(Assembler context, short instruction);
 	}
 	public class Trap : Op {
@@ -699,7 +745,7 @@ namespace LC_Sharp {
 			this.name = name;
 			code = (short)(0xF000 | vector);
 		}
-		public short Assemble(Assembler context, string instruction) {
+		public short Assemble(Assembler context, string[] args) {
 			return code;
 		}
 		public string Dissemble(Assembler context, short instruction) {
@@ -717,10 +763,9 @@ namespace LC_Sharp {
 			this.code = code;
 			this.operands = operands;
 		}
-		public short Assemble(Assembler context, string instruction) {
+		public short Assemble(Assembler context, string[] args) {
 			short bitIndex = 12;
 			short result = 0;
-			string[] args = instruction.Split(' ', '\r', '\n', '\t');
 			result |= (short)(code << bitIndex);
 			args = string.Join("", args.Skip(1)).Split(',');
 			int index = 0;
@@ -736,11 +781,11 @@ namespace LC_Sharp {
 						break;
 					case Operands.Reg: {
 							if (index >= args.Length) {
-								context.Error($"Missing register in {instruction}");
+								context.Error($"Missing register in {args}");
 							}
 
 							if (!context.Register(args[index], out short reg)) {
-								context.Error($"Register expected: '{args[index]}' in {instruction}");
+								context.Error($"Register expected: '{args[index]}' in {args}");
 							}
 							bitIndex -= 3;
 							result |= (short)(reg << bitIndex);
@@ -749,7 +794,7 @@ namespace LC_Sharp {
 						}
 					case Operands.FlagRegImm5: {
 							if (index >= args.Length) {
-								context.Error($"Missing operand in {instruction}");
+								context.Error($"Missing operand in {args}");
 							}
 							if (!context.Register(args[index], out short reg)) {
 								if (!context.Immediate(args[index], 5, out short imm5)) {
@@ -769,7 +814,7 @@ namespace LC_Sharp {
 						}
 					case Operands.Imm6: {
 							if (index >= args.Length) {
-								context.Error($"Missing operand in {instruction}");
+								context.Error($"Missing operand in {args}");
 							}
 							if (!context.Immediate(args[index], 5, out short imm5)) {
 								context.Error($"Imm5 value expected: {args[index]}");
@@ -784,7 +829,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset9: {
 							if (index >= args.Length) {
-								context.Error($"Insufficient label in {instruction}");
+								context.Error($"Insufficient label in {args}");
 							}
 							bitIndex -= 9;
 							result |= (short)(context.Offset(args[index], 9) << bitIndex);
@@ -793,7 +838,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset6: {
 							if (index >= args.Length) {
-								context.Error($"Missing label in {instruction}");
+								context.Error($"Missing label in {args}");
 							}
 							bitIndex -= 6;
 							result |= (short)(context.Offset(args[index], 6) << bitIndex);
@@ -802,7 +847,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset11: {
 							if (index >= args.Length) {
-								context.Error($"Missing label in {instruction}");
+								context.Error($"Missing label in {args}");
 							}
 							bitIndex -= 11;
 							result |= (short)(context.Offset(args[index], 11) << bitIndex);
