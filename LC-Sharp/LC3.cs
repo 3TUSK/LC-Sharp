@@ -10,7 +10,7 @@ namespace LC_Sharp {
 		public Processing processing;
 		public Memory memory;
 		public short bus;
-		public bool active => (memory.Read(unchecked ((short)0xFFFE))) & 0x8000) != 0;
+		public bool active => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) != 0);
 		public enum Status {
 			ACTIVE, TRAP, ERROR, HALT
 		}

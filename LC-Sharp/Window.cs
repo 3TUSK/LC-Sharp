@@ -108,7 +108,7 @@ namespace LC_Sharp {
 					status.Text = "Halt".PadSurround(16, '-');
 					break;
 				case LC3.Status.TRAP:
-					status.Text = "Waiting".PadSurround(16, '-');
+					status.Text = "Wait for TRAP".PadSurround(16, '-');
 					break;
 				case LC3.Status.ERROR:
 					status.Text = "ERROR".PadSurround(16, '-');
