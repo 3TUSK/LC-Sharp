@@ -10,6 +10,7 @@ namespace LC_Sharp {
 		public Processing processing;
 		public Memory memory;
 		public short bus;
+		public bool active => (memory.Read(unchecked ((short)0xFFFE))) & 0x8000) != 0;
 		public enum Status {
 			ACTIVE, TRAP, ERROR, HALT
 		}
@@ -39,6 +40,9 @@ namespace LC_Sharp {
 		}
 		public void Execute() => Execute(control.ir);
 		public void Execute(short instruction) {
+			//If the Machine Control Register has been cleared, we halt
+			if (!active)
+				status = Status.HALT;
 			//Get the opcode;
 			switch (instruction >> 12) {
 				case 0b0000:
@@ -279,10 +283,21 @@ namespace LC_Sharp {
 		public List<InstructionPass> secondPass;
 		public Dictionary<string, short> labels { get; private set; } //labels
 		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
-		public Dictionary<string, short> trapVectorTable { get; private set; }
-		Func<string, short, Instruction> br = (string name, short code) => new Instruction(name, 0, new[] { Operands.b000, Operands.LabelOffset9 });
+		public Dictionary<string, short> trapLookup { get; private set; }
+		public Dictionary<short, string> comments { get; private set; }
+		public HashSet<short> nonInstruction { get; private set; }
+		/*
+		public static Instruction Br(string name, short code) => new Instruction(name, (short) (0 | code), new[] { Operands.nzp, Operands.LabelOffset9 });
+		*/
 		OpLookup ops = new OpLookup(
-			new Instruction("BR", 0, new[] { Operands.b000, Operands.LabelOffset9 }),
+			new Instruction("BR", 0, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRn", 0x0800, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRz", 0x0400, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRp", 0x0200, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRnz", 0x0C00, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRzp", 0x0600, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRnp", 0x0A00, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new Instruction("BRnzp", 0x0E00, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
 			new Instruction("LD", 2, new[] { Operands.Reg, Operands.LabelOffset9 }),
 			new Instruction("ST", 3, new[] { Operands.Reg, Operands.LabelOffset9 }),
@@ -306,8 +321,14 @@ namespace LC_Sharp {
 		public Assembler(LC3 lc3) {
 			this.lc3 = lc3;
 			pc = lc3.control.pc;
+			pc++;
 			reader = new Reader("");
+			labels = new Dictionary<string, short>();
+			labelsReverse = new Dictionary<short, string>();
+			trapLookup = new Dictionary<string, short>();
+			comments = new Dictionary<short, string>();
 			secondPass = new List<InstructionPass>();
+			nonInstruction = new HashSet<short>();
 		}
 		//Assemble the given lines as new source to an existing program
 		public void AssembleToPC(params string[] lines) {
@@ -329,69 +350,140 @@ namespace LC_Sharp {
 			SecondPass();
 		}
 		public void FirstPass() {
-			switch(reader.Read(out string token)) {
-				case TokenType.Symbol:
-
-					break;
-				case TokenType.Comma:
-
-					break;
-			}
-			
-		}
-		private void TryInstruction(string symbol) {
-			
 			Read:
-			switch(reader.Read(out string second)) {
+			switch (reader.Read(out string token)) {
 				case TokenType.Symbol:
-					
-					break;
-				case TokenType.Directive:
-					//A label for a directive
-					Label(symbol);
-					Directive(second);
-					break;
+					HandleSymbol(token);
+					//Print($"Line {reader.line}: Token {token}");
+					goto Read;
 				case TokenType.Comma:
-					//Unexpected
 					Error("Unexpected Comma");
-					break;
+					goto Read;
+				case TokenType.Directive:
+					//Print($"Line {reader.line}: Token {token}");
+					Directive(token);
+					goto Read;
+				case TokenType.String:
+					Error("Unexpected String");
+					goto Read;
 				case TokenType.Comment:
-					//Skip and record
+
 					goto Read;
 				case TokenType.End:
-					//Last instruction or label
-					if(InstructionPass(symbol, new string[0], out InstructionPass passed)) {
-						secondPass.Add(passed);
-					} else {
-						Label(symbol);
+					break;
+			}
+			Print("First Passed");
+		}
+		void HandleSymbol(string symbol) {
+			if (ops.TryName(symbol, out Op op)) {
+				HandleOp(op);
+			} else {
+				Label(symbol);
+			}
+		}
+		public void HandleOp(Op op) {
+			//If this op has zero operands, we specifically stop parsing it here because we could incorrectly interpret a subsequent label as an argument
+			List<string> args = new List<string>();
+			if (op.operandCount == 0) {
+				HandleInstruction(op, args);
+				//Return so that we don't parse arguments anyway
+				return;
+			}
+
+			bool expectComma = false;
+			int argCount = 0;
+
+			ReadArg:
+			switch (reader.Read(out string arg)) {
+				case TokenType.Symbol: {
+						if (expectComma) {
+
+							//We expected a comma here. There's no comma, so this is either a new instruction or new label
+
+							//Stop parsing this instruction
+							HandleInstruction(op, args);
+							//Start handling the next symbol
+							HandleSymbol(arg);
+
+						} else {
+							//We expected a regular argument here
+
+							//If we get another op
+							if (ops.TryName(arg, out Op next)) {
+								//And we just passed a comma
+								if (argCount > 0) {
+									Error("Argument expected after comma");
+								} else {
+									HandleInstruction(op, args);
+									HandleOp(next);
+								}
+							} else {
+								//Otherwise, regular argument
+								argCount++;
+								args.Add(arg);
+								expectComma = true;
+								goto ReadArg;
+							}
+						}
+
+						break;
 					}
+				case TokenType.Comma:
+					if (expectComma) {
+						expectComma = false;
+						goto ReadArg;
+					} else {
+						Error("Unexpected comma");
+					}
+
+					break;
+				case TokenType.Comment:
+					goto ReadArg;
+				case TokenType.Directive:
+					HandleInstruction(op, args);
+					Directive(arg);
+					break;
+				case TokenType.End:
+					HandleInstruction(op, args);
+					break;
+				case TokenType.String:
+					Error("Unexpected String");
 					break;
 			}
 		}
-		private List<string> TryArgs(string first) {
-			List<string> args = new List<string> { first };
-			Read:
-			switch(reader.Read(out string token)) {
-				case TokenType.Symbol:
-					//If we have a third symbol with no comma before it, then this is probably our only argument
-					break;
-				case TokenType.Comment:
-					goto Read;
-					case TokenType.
+		public void HandleInstruction(Op op, List<string> args) {
+			if(op.twoPass) {
+				Print($"Line {reader.line}: Two Pass Instruction {op.name} {string.Join(", ", args)} at {(pc-1).ToHexString()}");
+				secondPass.Add(new InstructionPass(this, op, args.ToArray()));
+			} else {
+				Print($"Line {reader.line}: One Pass Instruction {op.name} {string.Join(", ", args)} at {(pc - 1).ToHexString()}");
+				lc3.memory.Write((short)(pc - 1), op.Assemble(this, args.ToArray()));
+			}
+			//Don't forget to increment the PC because we just wrote an instruction
+			pc++;
+		}
+		public void HandleComment(string comment) {
+			if(comments.ContainsKey((short) (pc - 1))) {
+				comments[(short)(pc - 1)] += comment;
+			} else {
+				comments[(short)(pc - 1)] = comment;
 			}
 		}
 		public void SecondPass() {
-			short pc = this.pc;
-			int index = reader.index;
+			short pcSave = this.pc;
+			int indexSave = reader.index;
 			//Second Pass
 			foreach (var pass in secondPass) {
 				pc = pass.pc;
 				reader.index = pass.index;
 				var i = pass.args;
+
+				Print($"Line {reader.line}: Two Pass Instruction {pass.op.name} {string.Join(", ", pass.args)} at {(pc - 1).ToHexString()}");
+
 				lc3.memory.Write((short)(pc - 1), pass.Assemble(this));
 			}
-			this.pc = pc;
-			reader.index = index;
+			this.pc = pcSave;
+			reader.index = indexSave;
 			//Remember to clear secondPass.
 			//There was a bug where second passes from future .ENDs would attempt to recompile old instruction passes
 			secondPass.Clear();
@@ -400,13 +492,17 @@ namespace LC_Sharp {
 			this.pc = pc;
 
 			//This might be a FILLED value, but we can't tell
-			if (Lookup((short) (pc - 1), out string label))
-				return label;
+			if(nonInstruction.Contains((short) (pc))) {
+				if (Lookup((short)(pc), out string label))
+					return $"{label} {lc3.memory.Read((short) (pc)).ToHexString()}";
+				else
+					return $"[DATA] {lc3.memory.Read((short)(pc)).ToHexString()}";
+			}
 
 			//For TRAP Subroutines, we consider their entire code to be an opcode
 			if ((instruction & 0xF000) == 0xF000) {
 				var s = Convert.ToString(instruction, 2);
-				if(ops.TryCode(instruction, out Op result))
+				if (ops.TryCode(instruction, out Op result))
 					return result.Dissemble(this, instruction);
 				return instruction.ToRegisterString();
 			} else if ((instruction & 0xFE00) == 0) {
@@ -417,57 +513,123 @@ namespace LC_Sharp {
 		}
 		public void Directive(string directive) {
 			switch (directive) {
-				case ".BLKW":
-					short length = short.Parse(parts[1]);
-					for (int i = 0; i < length; i++) {
-						pc++;
+				case ".BLKW": {
+						short length = 0;
+						Read:
+						switch(reader.Read(out string token)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.Symbol:
+								if(!short.TryParse(token, out length)) {
+									Error("Invalid short value");
+								}
+								break;
+							default:
+								Error("Expected short value");
+								return;
+						}
+						for (int i = 0; i < length; i++) {
+							nonInstruction.Add((short) (pc - 1));
+							pc++;
+						}
+						break;
 					}
-					break;
 				case ".BREAK":
 					break;
-				case ".FILL":
-					lc3.memory.Write((short)(pc - 1), Fill(parts[1]));
-					pc++;
-					break;
+				case ".FILL": {
+						short value = 0;
+						Read:
+						switch (reader.Read(out string token)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.Symbol:
+								value = Fill(token);
+								break;
+							default:
+								Error("Expected short value");
+								return;
+						}
+						short location = (short)(pc - 1);
+						Print($"Line {reader.line}: Passed Directive {directive} at {(pc - 1).ToHexString()}");
+						nonInstruction.Add(location);
+						lc3.memory.Write(location, value);
+						pc++;
+
+						break;
+					}
 				case ".END":
 					//End of file, indicates that we should second-pass and clear out labels now
 					SecondPass();
 					ClearLabels();
+					Print($"Line {reader.line}: END current scope");
 					break;
-				case ".ORIG":
-					string orig = parts[1];
+				case ".ORIG": {
+						Read:
+						switch (reader.Read(out string orig)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.Symbol:
+								break;
+							default:
+								Error("Expected short value");
+								return;
+						}
 
-					if(!orig.StartsWith("X", true, null)) {
-						Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
+						if (!orig.StartsWith("X", true, null)) {
+							Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
+						}
+						Print($"Line {reader.line}: ORIG {orig}");
+
+						orig = orig.Substring(1);
+						pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
+						break;
 					}
-					Print($"Line {reader.line}: ORIG {orig}");
-
-					orig = orig.Substring(1);
-					pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
-					break;
-				case ".STRINGZ":
-					string s = parts[1];
-					if (s.StartsWith("\"") && s.EndsWith("\"")) {
+				case ".STRINGZ": {
+						Read:
+						switch (reader.Read(out string s)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.String:
+								break;
+							default:
+								Error("Expected string value");
+								return;
+						}
 						for (int i = 1; i < s.Length - 1; i++) {
+							nonInstruction.Add((short)(pc - 1));
 							lc3.memory.Write((short)(pc - 1), (short)s[i]);
 							pc++;
 						}
+						nonInstruction.Add((short)(pc - 1));
 						lc3.memory.Write((short)(pc - 1), 0);
 						pc++;
+						break;
 					}
-					break;
-				case ".TRAP":
-					//Write the current location to the TRAP vector table
-					lc3.memory.Write(trapVectorIndex, (short) (pc - 1));
+				case ".TRAP": {
+						Read:
+						switch (reader.Read(out string name)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.Symbol:
+								break;
+							default:
+								Error("Expected symbol value");
+								return;
+						}
 
-					//The operand is the name of the TRAP Subroutine
-					string name = parts[1];
-					Print($"Line {reader.line}: TRAP {name}");
-					ops.Add(new Trap(name, trapVectorIndex));
-					
-					//Increment the TRAP vector index
-					trapVectorIndex++;
-					break;
+						short start = (short)(pc - 1);
+						trapLookup[name] = start;
+						//Write the current location to the TRAP vector table
+						lc3.memory.Write(trapVectorIndex, start);
+
+						//The operand is the name of the TRAP Subroutine
+						Print($"Line {reader.line}: TRAP {name}");
+						ops.Add(new Trap(name, trapVectorIndex));
+
+						//Increment the TRAP vector index
+						trapVectorIndex++;
+						break;
+					}
 			}
 			short Fill(string code) {
 				if (code.StartsWith("b")) {
@@ -547,63 +709,6 @@ namespace LC_Sharp {
 			return true;
 		}
 		*/
-		public bool InstructionPass(string opname, string[] args, out InstructionPass passed) {
-			passed = null;
-			//context.Print($"Op: {opname}");
-			switch (opname) {
-				case var br when br.StartsWith("BR"): {
-						//BRnzp has complicated syntax so we evaluate it here
-						bool n = false, z = false, p = false;
-						foreach (char c in br.Substring(2)) {
-							switch (c) {
-								case 'n':
-									if (n) {
-										Error($"Repeated condition code 'n'");
-									} else {
-										n = true;
-									}
-									break;
-								case 'z':
-									if (z) {
-										Error($"Repeated condition code 'z'");
-									} else {
-										z = true;
-									}
-									break;
-								case 'p':
-									if (p) {
-										Error($"Repeated condition code 'p'");
-									} else {
-										p = true;
-									}
-									break;
-							}
-						}
-						short precode = (short)((n ? 0x0800 : 0) | (z ? 0x0400 : 0) | (p ? 0x0200 : 0));
-						passed = new InstructionPass(this, ops.Name("BR"), args, precode);
-						break;
-					}
-				default: {
-						if (ops.TryName(opname, out Op op)) {
-
-							//To do: Check the number of operands
-							if(op.operandCount != args.Count()) {
-								Error($"Op {opname} requires exactly {op.operandCount} operands");
-							}
-
-
-							passed = new InstructionPass(this, op, args);
-						} else {
-							//context.Print($"Unknown instruction: {opname}");
-							return false;
-						}
-						break;
-					}
-			}
-			Print($"Line {reader.line}: Pre-Assembled {opname}");
-			return true;
-		}
-
 
 		public void ClearLabels() {
 			labels.Clear();
@@ -651,7 +756,11 @@ namespace LC_Sharp {
 		}
 		//Create a label at the current line
 		public void Label(string label) {
+			if(labels.ContainsKey(label)) {
+				Error($"Duplicate Label {label}");
+			}
 			short location = (short)(pc - 1);
+			Print($"Line {reader.line}: Passed Label {label} at {location.ToHexString()}");
 			labels[label] = location;
 			labelsReverse[location] = label;
 		}
@@ -710,6 +819,7 @@ namespace LC_Sharp {
 		LabelOffset9,       //Size 9, an 9-bit offset from a pc to a label
 		LabelOffset11,      //Size 11, an 11-bit offset from a pc to a label
 	}
+
 	public class InstructionPass {
 		//Stores info for assembling an instruction in the second pass
 		public short pc { get; private set; }
@@ -767,9 +877,9 @@ namespace LC_Sharp {
 			short bitIndex = 12;
 			short result = 0;
 			result |= (short)(code << bitIndex);
-			args = string.Join("", args.Skip(1)).Split(',');
 			int index = 0;
 			foreach (Operands operand in operands) {
+				string arg = index >= args.Length ? null : args[index];
 				switch (operand) {
 					case Operands.b1:
 						bitIndex--;
@@ -780,12 +890,11 @@ namespace LC_Sharp {
 						bitIndex -= 3;
 						break;
 					case Operands.Reg: {
-							if (index >= args.Length) {
+							if (args == null) {
 								context.Error($"Missing register in {args}");
 							}
-
-							if (!context.Register(args[index], out short reg)) {
-								context.Error($"Register expected: '{args[index]}' in {args}");
+							if (!context.Register(arg, out short reg)) {
+								context.Error($"Register expected: [{arg}] in {args}");
 							}
 							bitIndex -= 3;
 							result |= (short)(reg << bitIndex);
@@ -793,12 +902,12 @@ namespace LC_Sharp {
 							break;
 						}
 					case Operands.FlagRegImm5: {
-							if (index >= args.Length) {
+							if (arg == null) {
 								context.Error($"Missing operand in {args}");
 							}
-							if (!context.Register(args[index], out short reg)) {
-								if (!context.Immediate(args[index], 5, out short imm5)) {
-									context.Error($"Imm5 value expected: {args[index]}");
+							if (!context.Register(arg, out short reg)) {
+								if (!context.Immediate(arg, 5, out short imm5)) {
+									context.Error($"Imm5 value expected: {arg}");
 								} else {
 									bitIndex--;
 									result |= (short)(1 << bitIndex);
@@ -813,11 +922,11 @@ namespace LC_Sharp {
 							break;
 						}
 					case Operands.Imm6: {
-							if (index >= args.Length) {
+							if (arg == null) {
 								context.Error($"Missing operand in {args}");
 							}
-							if (!context.Immediate(args[index], 5, out short imm5)) {
-								context.Error($"Imm5 value expected: {args[index]}");
+							if (!context.Immediate(arg, 5, out short imm5)) {
+								context.Error($"Imm5 value expected: {arg}");
 							} else {
 								bitIndex--;
 								result |= (short)(1 << bitIndex);
@@ -828,29 +937,29 @@ namespace LC_Sharp {
 							break;
 						}
 					case Operands.LabelOffset9: {
-							if (index >= args.Length) {
+							if (arg == null) {
 								context.Error($"Insufficient label in {args}");
 							}
 							bitIndex -= 9;
-							result |= (short)(context.Offset(args[index], 9) << bitIndex);
+							result |= (short)(context.Offset(arg, 9) << bitIndex);
 							index++;
 							break;
 						}
 					case Operands.LabelOffset6: {
-							if (index >= args.Length) {
+							if (arg == null) {
 								context.Error($"Missing label in {args}");
 							}
 							bitIndex -= 6;
-							result |= (short)(context.Offset(args[index], 6) << bitIndex);
+							result |= (short)(context.Offset(arg, 6) << bitIndex);
 							index++;
 							break;
 						}
 					case Operands.LabelOffset11: {
-							if (index >= args.Length) {
+							if (arg == null) {
 								context.Error($"Missing label in {args}");
 							}
 							bitIndex -= 11;
-							result |= (short)(context.Offset(args[index], 11) << bitIndex);
+							result |= (short)(context.Offset(arg, 11) << bitIndex);
 							index++;
 							break;
 						}
@@ -907,7 +1016,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset9.ToString());
+								args.Add(offset9.ToHexString());
 							}
 							break;
 						}
@@ -918,7 +1027,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset6.ToString());
+								args.Add(offset6.ToHexString());
 							}
 							break;
 						}
@@ -929,7 +1038,7 @@ namespace LC_Sharp {
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset11.ToString());
+								args.Add(offset11.ToHexString());
 							}
 							break;
 						}
@@ -947,7 +1056,11 @@ namespace LC_Sharp {
 			set {
 				_index = value;
 				line = source.Take(index).Count(c => c == '\n');
-				column = index - source.LastIndexOf('\n', index);
+				int lastNewline = source.LastIndexOf('\n', index != source.Length ? index : index - 1);
+				if (lastNewline == -1)
+					lastNewline = 0;
+				column = index - lastNewline + 3*source.Substring(lastNewline, index - lastNewline).Count(c => c == '\t');
+
 			}
 		}
 
@@ -955,6 +1068,7 @@ namespace LC_Sharp {
 		public int column;
 		
 		public Reader(string source) {
+			this.source = source;
 			index = 0;
 			line = 0;
 			column = 0;
@@ -976,10 +1090,7 @@ namespace LC_Sharp {
 					ProcessChar();
 					goto Read;
 				case '\t':
-					ProcessChar();
-					ProcessChar();
-					ProcessChar();
-					ProcessChar();
+					ProcessChar(4);
 					goto Read;
 				case '\n':
 					ProcessNewline();
@@ -991,7 +1102,7 @@ namespace LC_Sharp {
 					token = ReadSubstring();
 					return TokenType.Directive;
 				case ';':
-					token = ReadSubstring();
+					token = ReadLine();
 					return TokenType.Comment;
 				case '"':
 					ProcessChar();
@@ -1020,8 +1131,8 @@ namespace LC_Sharp {
 					ProcessChar();
 					return result;
 				default:
-					ProcessChar();
 					result += source[index];
+					ProcessChar();
 					goto Read;
 			}
 		}
@@ -1036,10 +1147,11 @@ namespace LC_Sharp {
 				case '\t':
 				case '\r':
 				case '\n':
+				case ',':
 					return result;
 				default:
-					ProcessChar();
 					result += source[index];
+					ProcessChar();
 					goto Read;
 			}
 		}
@@ -1054,20 +1166,17 @@ namespace LC_Sharp {
 				case '\n':
 					return result;
 				case '\t':
-					ProcessChar();
-					ProcessChar();
-					ProcessChar();
-					ProcessChar();
+					ProcessChar(4);
 					goto Read;
 				default:
-					ProcessChar();
 					result += source[index];
+					ProcessChar();
 					goto Read;
 			}
 		}
-		void ProcessChar() {
+		void ProcessChar(int columns = 1) {
 			index++;
-			column++;
+			column += columns;
 		}
 		void ProcessNewline() {
 			index++;

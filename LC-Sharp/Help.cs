@@ -30,6 +30,9 @@
 		public static string ToRegisterString(this int r) {
 			return $"0x{r.ToString("X").PadLeft(4, '0')} #{r.ToString()}";
 		}
+		public static string ToHexString(this ushort r) => ((int)r).ToHexString();
+		public static string ToHexString(this short r) => ((int)r).ToHexString();
+		public static string ToHexString(this int r) => $"0x{r.ToString("X").PadLeft(4, '0')}";
         /*
         //Functions to be used with ushorts containing smaller-sized numbers
         //Converts ushort to ushort with equivalent bit pattern

@@ -30,7 +30,17 @@ namespace LC_Sharp {
         public Emulator() {
 			lc3 = new LC3();
 			assembly = new Assembler(lc3);
-			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
+			//assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleLines(
+				"LD R0, VALUE",
+				"JSR SUBROUTINE",
+				"JSR SUBROUTINE",
+				"JSR SUBROUTINE",
+				"JSR SUBROUTINE",
+				"VALUE .FILL #10",
+				"SUBROUTINE ADD R0, R0, R0",
+				"RET"
+				);
 			Console.ReadLine();
 			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
