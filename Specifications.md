@@ -26,9 +26,11 @@
   - `Write(ushort mar, ushort mdr)`: Used by the handler to directly write to memory
 - `Assembler`: Current implementation of the LC-3 assembler. Converts assembly string code to short integer data, or shortcode.
 
-# GUI
+# Command-line arguments
+
+## GUI Mode
 ```
-lcs -g {program_file} [input_file] [output_file]
+lcs gui {program_file} [input_file] [output_file] - launches LC-Sharp in GUI mode
 ```
 - Instructions
   - A scrollable view of the LC-3's main memory. The current instruction about to be executed is highlighted.
@@ -64,9 +66,10 @@ lcs -g {program_file} [input_file] [output_file]
 - Input
   - A text view containing the program's input.
   - The KBSR is checked during the main loop and any input is read from this view and sent to the KBDR.
-# CLI
+
+## CLI
 ```
-lcs -c {program_file} [input_file] [output_file]
+lcs cli {program_file} [input_file] [output_file] - launches LC-Sharp in headless (command-line) mode
 ```
 - In CLI mode, the emulator runs the entire program with no GUI.
 - Input
