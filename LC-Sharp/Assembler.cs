@@ -68,15 +68,16 @@ namespace LC_Sharp
 
         public NeoAssembler(ParsedFile parsedFile) => _parsedFile = parsedFile;
 
-        public Dictionary<ushort, ushort> Assemble()
+        public Dictionary<short, short> Assemble()
         {
-            var assembleResult = new Dictionary<ushort, ushort>();
+            var assembleResult = new Dictionary<short, short>();
             foreach (var instr in _parsedFile.Instructions)
             {
                 var singleInstructionAssembler = AssemblerController.Find(instr.Value.GetInstruction().Split(' ').First());
                 if (singleInstructionAssembler != null)
                 {
-                    assembleResult[instr.Key] = singleInstructionAssembler.Assemble(instr.Value.GetInstruction(), instr.Key, _parsedFile);
+                    // TODO (3TUSK): Also change other places to short
+                    assembleResult[(short) instr.Key] = (short) singleInstructionAssembler.Assemble(instr.Value.GetInstruction(), instr.Key, _parsedFile);
                 }
                 else
                 {
