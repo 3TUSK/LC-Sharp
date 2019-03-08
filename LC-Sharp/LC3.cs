@@ -10,7 +10,7 @@ namespace LC_Sharp {
 		public Processing processing;
 		public Memory memory;
 		public short bus;
-		public bool active => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) != 0);
+		public bool halted => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) == 0);
 		public enum Status {
 			ACTIVE, TRAP, ERROR, HALT
 		}
@@ -41,7 +41,7 @@ namespace LC_Sharp {
 		public void Execute() => Execute(control.ir);
 		public void Execute(short instruction) {
 			//If the Machine Control Register has been cleared, we halt
-			if (!active)
+			if (halted)
 				status = Status.HALT;
 			//Get the opcode;
 			switch (instruction >> 12) {
