@@ -24,8 +24,24 @@
   - `memEnW()`: Writes the data of `mdr` to `mem` at the address in `mar`
   - `Read(ushort mar)`: Used by the handler to directly read from memory
   - `Write(ushort mar, ushort mdr)`: Used by the handler to directly write to memory
-- `Assembler`: Current implementation of the LC-3 assembler. Converts assembly string code to short integer data, or shortcode.
-
+- `Assembler`: Alex Chen's implementation of an LC-3 assembler. Converts assembly string code to short integer data, or shortcode.
+  - `List<InstructionPass> secondPass`: A list of instructions that require a second pass.
+  - `Dictionary<string, short> labels`: Maps labels to memory locations
+  - `Dictionary<short, string> labelsReverse`: Maps memory locations to labels
+  - `Dictionary<string, short> trapLookup`: Maps a TRAP instruction name to its starting location.
+  - `HashSet<short> nonInstruction`: Tracks the memory locations used for pure data for debug purpses.
+  - `OpLookup ops`: A lookup table for Ops by name and by code (TRAP subroutines use their full code for lookup since they have the same opcode).
+  - `short trapVectorIndex`: The index on the TRAP vector table where the starting location of the next declared TRAP instruction will be stored.
+  - `AssembleLines(params string[] lines)`: Assembles two passes for an array of lines at the current PC, clearing any instructions previously queued for second passing.
+  - `FirstPass()`: Reads through the string code, handling instructions, Directives, and labels. If an instruction needs a second pass, we store it (with contextual `pc` and line `index` info) for second passing later.
+  - `SecondPass()`: Handles all instructions stored for second pass, loading the instruction's `pc` and line `index` context info and then assembling it.
+  - `Directive(string directive)`: Handles a named directive.
+  - `.BLKW`: Skips the `pc` assembly context over a segment of memory locations.
+  - `.FILL`: Sets the data at the current memory location to the given value.
+  - `.END`: Ends the current scope by calling the second pass on instructions handled so far and clearing labels. Does not end the assembly process (the aforementioned scope functionality should be moved to a new directive called `.SCOPE`).
+  - `.TRAP`: Declares a new TRAP subroutine with the given name, adding the current memory location to the TRAP vector table and adding a new Trap object to the `ops` table.
+  - `.STRINGZ`: Places the characters of the given string into a segment of memory locations the last of which will be set to `0`.
+- `NeoAssembler`: Yourui Xue's implementation of an LC-3 assembler.
 # Command-line arguments
 
 ## GUI Mode
