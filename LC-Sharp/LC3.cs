@@ -294,7 +294,6 @@ namespace LC_Sharp {
 		public static Instruction Br(string name, short code) => new Instruction(name, (short) (0 | code), new[] { Operands.nzp, Operands.LabelOffset9 });
 		*/
 		OpLookup ops = new OpLookup(
-			new Instruction("BR", 0, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("BRn", 0x0800, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("BRz", 0x0400, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("BRp", 0x0200, new[] { Operands.nzp, Operands.LabelOffset9 }),
@@ -302,23 +301,23 @@ namespace LC_Sharp {
 			new Instruction("BRzp", 0x0600, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("BRnp", 0x0A00, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("BRnzp", 0x0E00, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("ADD", 0x1000, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
-			new Instruction("LD", 0x2000, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("ST", 0x3000, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("JSR", 0x4000, new[] { Operands.b1, Operands.LabelOffset11 }),
-			new Instruction("JSRR", 0x4000, new[] { Operands.b000, Operands.Reg }),
-			new Instruction("AND", 0x5000, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
-			new Instruction("LDR", 0x6000, new[] { Operands.Reg, Operands.Reg, Operands.Imm6 }),
-			new Instruction("STR", 0x7000, new[] { Operands.Reg, Operands.Reg, Operands.Imm6 }),
-			new Instruction("RTI", 0x8000),
-			new Instruction("NOT", 0x9000, new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1 }),
-			new Instruction("LDI", 0xA000, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("STI", 0xB000, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("RET", 0xC000, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
-			new Instruction("JMP", 0xC000, new[] { Operands.b000, Operands.Reg }),
-			new Instruction("RESERVED", 0xD000),
-			new Instruction("LEA", 0xE000, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("TRAP", 0xF000)
+			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
+			new Instruction("LD", 2, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("ST", 3, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("JSR", 4, new[] { Operands.b1, Operands.LabelOffset11 }),
+			new Instruction("JSRR", 4, new[] { Operands.b000, Operands.Reg }),
+			new Instruction("AND", 5, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
+			new Instruction("LDR", 6, new[] { Operands.Reg, Operands.Reg, Operands.Imm6 }),
+			new Instruction("STR", 7, new[] { Operands.Reg, Operands.Reg, Operands.Imm6 }),
+			new Instruction("RTI", 8),
+			new Instruction("NOT", 9, new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1 }),
+			new Instruction("LDI", 10, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("STI", 11, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("RET", 12, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
+			new Instruction("JMP", 12, new[] { Operands.b000, Operands.Reg }),
+			new Instruction("RESERVED", 13),
+			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
+			new Instruction("TRAP", 15)
 		);
 		short trapVectorIndex = 0x0020;
 
@@ -869,11 +868,11 @@ namespace LC_Sharp {
 	}
 	public class Instruction : Op {
 		public string name { get; private set; }
-		public ushort code { get; private set; }
+		public short code { get; private set; }
 		public bool twoPass => operands.Any(o => o == Operands.LabelOffset6 || o == Operands.LabelOffset9 || o == Operands.LabelOffset11);
 		public int operandCount => operands.Count(o => o != Operands.b000 && o != Operands.b1 && o != Operands.nzp);
 		public Operands[] operands { get; private set; }
-		public Instruction(string name, ushort code, params Operands[] operands) {
+		public Instruction(string name, short code, params Operands[] operands) {
 			this.name = name;
 			this.code = code;
 			this.operands = operands;
@@ -881,7 +880,7 @@ namespace LC_Sharp {
 		public short Assemble(Assembler context, string[] args) {
 			short bitIndex = 12;
 			short result = 0;
-			result = (short)code;
+			result |= (short)(code << bitIndex);
 			int index = 0;
 			foreach (Operands operand in operands) {
 				string arg = index >= args.Length ? null : args[index];
