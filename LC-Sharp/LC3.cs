@@ -10,7 +10,7 @@ namespace LC_Sharp {
 		public Processing processing;
 		public Memory memory;
 		public short bus;
-		public bool halted => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) == 0);
+		private bool halted => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) == 0);
 		public enum Status {
 			ACTIVE, TRAP, ERROR, HALT
 		}
@@ -24,6 +24,9 @@ namespace LC_Sharp {
 			memory = new Memory(this);
 			processing = new Processing(this);
 			status = Status.ACTIVE;
+
+			//Init the MCR
+			memory.Write(-2, -1);
 		}
 		public void DebugPrint() {
 			processing.DebugPrint();
@@ -41,10 +44,12 @@ namespace LC_Sharp {
 		public void Execute() => Execute(control.ir);
 		public void Execute(short instruction) {
 			//If the Machine Control Register has been cleared, we halt
-			if (halted)
+			if (halted) {
 				status = Status.HALT;
+			}
 			//Get the opcode;
-			switch (instruction >> 12) {
+			short opcode = (short) ((instruction >> 12) & 0xF);	//Make sure it's only the 4 LSBs in case we have a negative number (which is how I broke RET when moving everything from ushort to short)
+			switch (opcode) {
 				case 0b0000:
 					//BR
 					processing.addr1mux = Processing.ADDR1MUX.pc;
@@ -258,7 +263,6 @@ namespace LC_Sharp {
 						trapReturn = control.pc;
 					}
 
-					control.gatePC();
 					processing.drmux = Processing.DRMUX.b111;
 					processing.ldReg();
 					processing.marmux = Processing.MARMUX.ir8;
@@ -310,8 +314,8 @@ namespace LC_Sharp {
 			new Instruction("NOT", 9, new[] { Operands.Reg, Operands.Reg, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1, Operands.b1 }),
 			new Instruction("LDI", 10, new[] { Operands.Reg, Operands.LabelOffset9 }),
 			new Instruction("STI", 11, new[] { Operands.Reg, Operands.LabelOffset9 }),
-			new Instruction("JMP", 12, new[] { Operands.b000, Operands.Reg }),
 			new Instruction("RET", 12, new[] { Operands.b000, Operands.b1, Operands.b1, Operands.b1 }),
+			new Instruction("JMP", 12, new[] { Operands.b000, Operands.Reg }),
 			new Instruction("RESERVED", 13),
 			new Instruction("LEA", 14, new[] { Operands.Reg, Operands.LabelOffset9 }),
 			new Instruction("TRAP", 15)
@@ -453,10 +457,10 @@ namespace LC_Sharp {
 		}
 		public void HandleInstruction(Op op, List<string> args) {
 			if(op.twoPass) {
-				Print($"Line {reader.line}: Two Pass Instruction {op.name} {string.Join(", ", args)} at {(pc-1).ToHexString()}");
+				Print($"Line {reader.line}: Two Pass Instruction {op.name} {string.Join(", ", args)} at {((short)(pc-1)).ToHexString()}");
 				secondPass.Add(new InstructionPass(this, op, args.ToArray()));
 			} else {
-				Print($"Line {reader.line}: One Pass Instruction {op.name} {string.Join(", ", args)} at {(pc - 1).ToHexString()}");
+				Print($"Line {reader.line}: One Pass Instruction {op.name} {string.Join(", ", args)} at {((short)(pc - 1)).ToHexString()}");
 				lc3.memory.Write((short)(pc - 1), op.Assemble(this, args.ToArray()));
 			}
 			//Don't forget to increment the PC because we just wrote an instruction
@@ -478,7 +482,7 @@ namespace LC_Sharp {
 				reader.index = pass.index;
 				var i = pass.args;
 
-				Print($"Line {reader.line}: Two Pass Instruction {pass.op.name} {string.Join(", ", pass.args)} at {(pc - 1).ToHexString()}");
+				Print($"Line {reader.line}: Two Pass Instruction {pass.op.name} {string.Join(", ", pass.args)} at {((short)(pc - 1)).ToHexString()}");
 
 				lc3.memory.Write((short)(pc - 1), pass.Assemble(this));
 			}
@@ -550,7 +554,7 @@ namespace LC_Sharp {
 								return;
 						}
 						short location = (short)(pc - 1);
-						Print($"Line {reader.line}: Passed Directive {directive} at {(pc - 1).ToHexString()}");
+						Print($"Line {reader.line}: Passed Directive {directive} at {((short)(pc - 1)).ToHexString()}");
 						nonInstruction.Add(location);
 						lc3.memory.Write(location, value);
 						pc++;
@@ -582,6 +586,7 @@ namespace LC_Sharp {
 
 						orig = orig.Substring(1);
 						pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
+						pc++;
 						break;
 					}
 				case ".STRINGZ": {
