@@ -20,7 +20,7 @@ namespace LC_Sharp {
         Label pcLabel, irLabel;
         private Button runAllButton;
 		private Button runStepOnceButton;
-		short instructionPC;
+		ushort instructionPC;
 
 		TextView input, output;
 
@@ -30,13 +30,17 @@ namespace LC_Sharp {
         public Emulator() {
 			lc3 = new LC3();
 			assembly = new Assembler(lc3);
-			//assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
 			assembly.AssembleLines(
+				".ORIG x3000",
+				//"GETC",
+				//"OUT",
 				"LD R0, VALUE",
 				"JSR SUBROUTINE",
 				"JSR SUBROUTINE",
 				"JSR SUBROUTINE",
 				"JSR SUBROUTINE",
+				"HALT",
 				"VALUE .FILL #10",
 				"SUBROUTINE ADD R0, R0, R0",
 				"RET"
@@ -124,8 +128,9 @@ namespace LC_Sharp {
 				int index = start + i;
 				labels[i] = new Label(0, index, $" {index.ToHexShort()} {assembly.Dissemble((short)index, lc3.memory.Read((short)index))}");
 			}
-
-			var l = labels.ElementAtOrDefault(lc3.control.pc - start);
+			//Use ushort because negative short values break the index
+			ushort pc = (ushort)lc3.control.pc;
+			var l = labels.ElementAtOrDefault(pc - start);
 			if (l != null) {
 				l.TextColor = MakeColor(ConsoleColor.White);
 			}
@@ -135,39 +140,14 @@ namespace LC_Sharp {
 		public void UpdateRegisterView() {
 			for (int i = 0; i < 8; i++) {
 				var r = lc3.processing.registers[i];
-				registerLabels[i].Text = $"R{i + 1} {r.ToRegisterString()}";
+				registerLabels[i].Text = $"R{i} {r.ToRegisterString()}";
 			}
 			ccLabel.Text = $"CC {(lc3.processing.N ? 'N' : lc3.processing.Z ? 'Z' : lc3.processing.P ? 'P' : '?')}";
 
 			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
 			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
 		}
-		public void UpdateIOView() {
-			short kbsr = unchecked ((short)0xFE00);
-			short kbdr = unchecked ((short) 0xFE02);
 
-			//See if KBSR is waiting for input
-			if(lc3.memory.Read(kbsr) == 0) {
-				//Check if we have input ready
-				if(input.Text.Length > 0) {
-					lc3.memory.Write(kbsr, unchecked ((short) 0xFFFF));			//Set KBSR ready
-					lc3.memory.Write(kbdr, input.Text[0]);	//Write in the first character from input window
-					input.Text = input.Text.Substring(1);	//Consume the first character from input window
-				}
-			}
-			
-
-
-			short dsr = unchecked ((short) 0xFE04);
-			short ddr = unchecked ((short) 0xFE06);
-
-			//DSR is waiting for output
-			if(lc3.memory.Read(dsr) == 0) {
-				char c = (char) lc3.memory.Read(ddr);		//Read char from DDR
-				output.Text = output.Text.ToString() + c;	//Send char to output window
-				lc3.memory.Write(dsr, unchecked ((short) 0xFFFF));              //Set DSR ready
-			}
-		}
 		public static Attribute MakeColor(ConsoleColor f) {
 			// Encode the colors into the int value.
 			return new Attribute((int)f & 0xffff);
@@ -181,7 +161,7 @@ namespace LC_Sharp {
 					return;
 				running = true;
 				Application.MainLoop.AddIdle(RunAll);
-				runAllButton.Text = "Pause";
+				runAllButton.Text = "Pause Run All";
 				status.Text = "Running All".PadSurround(16, '-');
 			}
 		}
@@ -211,7 +191,7 @@ namespace LC_Sharp {
 					return;
 				running = true;
 				Application.MainLoop.AddIdle(RunStep);
-				runStepOnceButton.Text = "Pause";
+				runStepOnceButton.Text = "Pause Run Step";
 				status.Text = "Running Step".PadSurround(16, '-');
 			}
 		}
@@ -225,6 +205,7 @@ namespace LC_Sharp {
 			Run();
 			//If we are running a TRAP instruction, we should wait for it to finish
 			if (lc3.status == LC3.Status.TRAP) {
+				ResetStatus();
 				return true;
 			} else {
 				StopRunStep();
@@ -232,29 +213,56 @@ namespace LC_Sharp {
 			}
 		}
 		public void Run() {
-			//Set the instructions pane to highlight the current PC
-			instructionPC = lc3.control.pc; //Set highlighted instruction PC
-			//Show the highlighted instruction in the center
-			instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height/2);
-			UpdateInstructionsView();
-			
-			//If we are running a TRAP instruction, we rerun it until it's done
-			//Note: We should modify this so that TRAP instructions still run PC as normal but don't update or center the highlighted instruction
-			if (lc3.status != LC3.Status.TRAP) {
-				lc3.Fetch();
-			}
+			//We execute TRAP instructions like regular subroutines but without updating the instruction highlight
+			lc3.Fetch();
 
-			if(lc3.control.ir == 0) {
+			if (lc3.control.ir == 0) {
 				lc3.status = LC3.Status.ERROR;
 				return;
 			}
 
 			lc3.Execute();
 
+			if(lc3.status != LC3.Status.TRAP) {
+				//Don't update the highlight if we're executing a subroutine
+				//Set the instructions pane to highlight the current PC
+				instructionPC = (ushort)lc3.control.pc; //Set highlighted instruction PC
+														//Show the highlighted instruction in the center
+														//Use ushort because negative short values break the instruction highlight index
+				instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height / 2);
+				UpdateInstructionsView();
+			}
+
 			UpdateRegisterView();
 			UpdateIOView();
 		}
-        public void Init() {
+		public void UpdateIOView() {
+			short kbsr = unchecked((short)0xFE00);
+			short kbdr = unchecked((short)0xFE02);
+
+			//See if KBSR is waiting for input
+			if (lc3.memory.Read(kbsr) == 0) {
+				//Check if we have input ready
+				if (input.Text.Length > 0) {
+					lc3.memory.Write(kbsr, unchecked((short)0xFFFF));           //Set KBSR ready
+					lc3.memory.Write(kbdr, input.Text[0]);  //Write in the first character from input window
+					input.Text = input.Text.Substring(1);   //Consume the first character from input window
+				}
+			}
+
+
+
+			short dsr = unchecked((short)0xFE04);
+			short ddr = unchecked((short)0xFE06);
+
+			//DSR is waiting for output
+			if (lc3.memory.Read(dsr) == 0) {
+				char c = (char)lc3.memory.Read(ddr);        //Read char from DDR
+				output.Text = output.Text.ToString() + c;   //Send char to output window
+				lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
+			}
+		}
+		public void Init() {
             //Application.UseSystemConsole = true;
             Application.Init();
             var top = Application.Top;
