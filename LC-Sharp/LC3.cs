@@ -595,7 +595,7 @@ namespace LC_Sharp {
 								Error("Expected string value");
 								return;
 						}
-						for (int i = 1; i < s.Length - 1; i++) {
+						for (int i = 0; i < s.Length - 1; i++) {
 							nonInstruction.Add((short)(pc - 1));
 							lc3.memory.Write((short)(pc - 1), (short)s[i]);
 							pc++;
