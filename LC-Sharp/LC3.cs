@@ -43,10 +43,6 @@ namespace LC_Sharp {
 		}
 		public void Execute() => Execute(control.ir);
 		public void Execute(short instruction) {
-			//If the Machine Control Register has been cleared, we halt
-			if (halted) {
-				status = Status.HALT;
-			}
 			//Get the opcode;
 			short opcode = (short) ((instruction >> 12) & 0xF);	//Make sure it's only the 4 LSBs in case we have a negative number (which is how I broke RET when moving everything from ushort to short)
 			switch (opcode) {
@@ -275,6 +271,10 @@ namespace LC_Sharp {
 					control.ldPC();
 					break;
 			}
+			//If the Machine Control Register has been cleared after this instruction, we halt
+			if (halted && status != Status.TRAP) {
+				status = Status.HALT;
+			}
 		}
 	}
 
@@ -285,6 +285,8 @@ namespace LC_Sharp {
 		public short pc { get; private set; }
 		public int index => reader.index;
 
+		private string scopeName;
+		private bool passing;
 		public List<InstructionPass> secondPass;
 		public Dictionary<string, short> labels { get; private set; } //labels
 		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
@@ -350,12 +352,18 @@ namespace LC_Sharp {
 
 		public void AssembleLines(params string[] lines) {
 			reader = new Reader(string.Join("\n", lines));
-			secondPass.Clear();
+			InitPass();
 			FirstPass();
 			SecondPass();
 		}
+		public void InitPass() {
+			passing = true;
+			secondPass.Clear();
+		}
 		public void FirstPass() {
 			Read:
+			if (!passing)
+				return;
 			switch (reader.Read(out string token)) {
 				case TokenType.Symbol:
 					HandleSymbol(token);
@@ -562,12 +570,13 @@ namespace LC_Sharp {
 
 						break;
 					}
-				case ".END":
-					//End of file, indicates that we should second-pass and clear out labels now
-					SecondPass();
-					ClearLabels();
-					Print($"Line {reader.line}: END current scope");
-					break;
+				case ".END": {
+						passing = false;
+						SecondPass();
+						ClearLabels();
+						Print($"Line {reader.line}: End of file");
+						break;
+					}
 				case ".ORIG": {
 						Read:
 						switch (reader.Read(out string orig)) {
@@ -588,6 +597,25 @@ namespace LC_Sharp {
 						orig = orig.Substring(1);
 						pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
 						pc++;
+						break;
+					}
+				case ".SCOPE": {
+						//Declares a new scope and indicates that we should second-pass and clear out labels now
+						SecondPass();
+						ClearLabels();
+						Print($"Line {reader.line}: Clear current scope");
+
+						Read:
+						switch (reader.Read(out scopeName)) {
+							case TokenType.Comment:
+								goto Read;
+							case TokenType.Symbol:
+								break;
+							default:
+								Error("Expected scope name");
+								return;
+						}
+
 						break;
 					}
 				case ".STRINGZ": {
@@ -634,6 +662,12 @@ namespace LC_Sharp {
 
 						//Increment the TRAP vector index
 						trapVectorIndex++;
+
+						//We also declare a new scope with this name
+						scopeName = name;
+						SecondPass();
+						ClearLabels();
+
 						break;
 					}
 			}
@@ -719,6 +753,18 @@ namespace LC_Sharp {
 		*/
 
 		public void ClearLabels() {
+			/*
+			if (scopeName != null) {
+				foreach(var label in labels.Keys.) {
+					string renamed = $"{scopeName}_{label}";
+					short location = labels[label];
+					labels[renamed] = location;
+					labels.Remove(label);
+
+					labelsReverse[location] = renamed;
+				}
+			}
+			*/
 			labels.Clear();
 			labelsReverse.Clear();
 		}
