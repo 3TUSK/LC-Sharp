@@ -41,7 +41,7 @@ SaveR3		.FILL	x0000
 SaveR4		.FILL	x0000
 SaveR5		.FILL	x0000
 SaveR6		.FILL	x0000
-			.END
+			;.END
 ;------------------------------------------------------------------
 			.ORIG	x0430		; System call starting address
 			.TRAP	OUT
@@ -59,7 +59,7 @@ Return		LD		R1, SaveR1	; Restore registers
 DSR			.FILL	xFE04		; Address of display status register
 DDR			.FILL	xFE06		; Address of display data register
 SaveR1		.BLKW	1
-			.END
+			;.END
 
 ;------------------------------------------------------------------
 			
@@ -96,7 +96,7 @@ SaveR0		.FILL	x0000
 SaveR1		.FILL	x0000
 SaveR3		.FILL	x0000
 SaveR7		.FILL	x0000
-			.END
+			;.END
 
 ;------------------------------------------------------------------
 			
@@ -164,7 +164,7 @@ SaveR3		.FILL	x0000
 SaveR4		.FILL	x0000
 SaveR5		.FILL	x0000
 SaveR6		.FILL	x0000
-			.END
+			;.END
 
 ;------------------------------------------------------------------
 ; This service routine writes a NULL-terminated string to the console.
@@ -258,7 +258,7 @@ RET					; JMP R7, actually
 
 ; Some constants
 
-ASCIINewLine .FILL xOOOA
+ASCIINewLine .FILL x000A
 SaveRO .BLKW 1
 SaveR1 .BLKW 1
 SaveR7 .BLKW 1
