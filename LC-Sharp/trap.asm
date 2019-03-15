@@ -167,6 +167,65 @@ SaveR6		.FILL	x0000
 			.END
 
 ;------------------------------------------------------------------
+; This service routine writes a NULL-terminated string to the console.
+; Differing from PUTS, PUTSP consider one 16-bit word as containing two
+; characters, and will write [7:0] as first character, and then [15:8]
+; as the second one. If [15:8] is zero, the string also terminates as if
+; it is a NULL (0x0000).
+; It services the PUTSP service call (TRAP x24).
+; Inputs: R0 is a pointer to the string to print.
+.ORIG x04C0
+.TRAP PUTSP
+
+PUTSP_BEGIN   ST R0, PUTSP_SAV_R0
+              ST R1, PUTSP_SAV_R1
+              ST R2, PUTSP_SAV_R2
+              ST R3, PUTSP_SAV_R3
+              ST R7, PUTSP_SAV_R7
+
+PUTSP_LOOP    LDI R1, R0
+              BRN PUTSP_END        ; Zero-terminated string ends at zero.
+              LD R3, PUTSP_L_MASK  ; Load the lower-nibble mask 0x00FF 
+              AND R2, R1, R3       ; Get the bits on [7:0]
+PUTSP_WAIT1   LDI R3, PUTSP_DSR
+              BRZP PUTSP_WAIT1     ; Wait until DSR is flagged as ready
+              STI R2, PUTSP_DDR
+              LD R3, PUTSP_H_MASK  ; Load the higher-nibble mask 0xFF00
+              AND R2, R1, R3       ; Get the bits on [15:8]. Caution, they still stay at [15:8] in R2 right now!
+              BRZ PUTSP_END        ; If the higher-nibble is zero, then the whole thing is zero as well, meaning we should terminate here.
+              AND R3, R3, #0       ; Clear R3 again, we need to re-use R3 for a counter
+              ADD R3, R3, #8       ; A for-loop that iterates 8 times
+PUTSP_FLIP    ADD R3, R3, #-1      ; Decrease counter by 1
+              ADD R2, R2, #0       ; Touch R2 so we can examine it
+              BRP PUTSP_LSHF
+              ADD R2, R2, #1       ; Rotate the MSB to the LSB if MSB is 1
+PUTSP_LSHF    ADD R2, R2, R2       ; R2 <- R2 * 2, i.e. left-shift by 1 bit
+              ADD R3, R3, #0       ; Touch R3
+              BRP PUTSP_FLIP
+PUTSP_WAIT2   LDI R3, PUTSP_DSR
+              BRZP PUTSP_WAIT2
+              STI R2, PUTSP_DDR
+              ADD R0, R0, #1       ; Move pointer in R0 to the next index
+              BRNZP PUTSP_LOOP     ; Unconditionally go back to the loop begin
+              
+PUTSP_END     LD R0, PUTSP_SAV_R0
+              LD R1, PUTSP_SAV_R1
+              LD R2, PUTSP_SAV_R2
+              LD R3, PUTSP_SAV_R3
+              LD R7, PUTSP_SAV_R7
+              RET
+
+PUTSP_DSR    .FILL        xFE04
+PUTSP_DDR    .FILL        xFE06
+PUTSP_L_MASK .FILL        x00FF
+PUTSP_H_MASK .FILL        xFF00
+PUTSP_SAV_R0 .FILL        #0
+PUTSP_SAV_R1 .FILL        #0
+PUTSP_SAV_R2 .FILL        #0
+PUTSP_SAV_R3 .FILL        #0
+PUTSP_SAV_R7 .FILL        #0
+
+;------------------------------------------------------------------
 			
 .ORIG xFD70			; Where this routine resides
 .TRAP HALT
