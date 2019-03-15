@@ -92,7 +92,7 @@ namespace LC_Sharp {
 			{
 				var w = new Window(new Rect(64, 0, 42, 22), "Output");
 				output = new TextView(new Rect(0, 0, 40, 20));
-				output.Text = "aaaaa";
+				output.Text = "";
 				output.ReadOnly = true;
 				w.Add(output);
 				window.Add(w);
@@ -243,6 +243,8 @@ namespace LC_Sharp {
 				//Don't update the highlight if we're executing a subroutine
 				//Set the instructions pane to highlight the current PC
 				UpdateHighlight();
+				//Do not update register view during a TRAP subroutine, but only if we don't watch them run
+				UpdateRegisterView();
 			}
 			UpdateIOView();
 		}
