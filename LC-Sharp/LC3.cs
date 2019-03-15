@@ -263,6 +263,7 @@ namespace LC_Sharp {
 						trapReturn = control.pc;
 					}
 
+					control.gatePC();
 					processing.drmux = Processing.DRMUX.b111;
 					processing.ldReg();
 					processing.marmux = Processing.MARMUX.ir8;
@@ -294,13 +295,14 @@ namespace LC_Sharp {
 		public static Instruction Br(string name, short code) => new Instruction(name, (short) (0 | code), new[] { Operands.nzp, Operands.LabelOffset9 });
 		*/
 		OpLookup ops = new OpLookup(
-			new Instruction("BRn", 0x0800, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRz", 0x0400, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRp", 0x0200, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRnz", 0x0C00, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRzp", 0x0600, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRnp", 0x0A00, new[] { Operands.nzp, Operands.LabelOffset9 }),
-			new Instruction("BRnzp", 0x0E00, new[] { Operands.nzp, Operands.LabelOffset9 }),
+			new BR("BRn", 0x0800),
+			new BR("BRz", 0x0400),
+			new BR("BRp", 0x0200),
+			new BR("BRnz", 0x0C00),
+			new BR("BRzp", 0x0600),
+			new BR("BRnp", 0x0A00),
+			new BR("BRnzp", 0x0E00),
+			new Instruction("BR", 0, new[] { Operands.nzp, Operands.LabelOffset9 }),
 			new Instruction("ADD", 1, new[] { Operands.Reg, Operands.Reg, Operands.FlagRegImm5 }),
 			new Instruction("LD", 2, new[] { Operands.Reg, Operands.LabelOffset9 }),
 			new Instruction("ST", 3, new[] { Operands.Reg, Operands.LabelOffset9 }),
@@ -553,7 +555,7 @@ namespace LC_Sharp {
 								return;
 						}
 						short location = (short)(pc - 1);
-						Print($"Line {reader.line}: Passed Directive {directive} at {((short)(pc - 1)).ToHexString()}");
+						Print($"Line {reader.line}: Passed Directive {directive} \"{token}\" / {value} with {(labelsReverse.TryGetValue(location, out string l) ? $"Label {l}" : "")} at {location.ToHexString()}");
 						nonInstruction.Add(location);
 						lc3.memory.Write(location, value);
 						pc++;
@@ -649,7 +651,7 @@ namespace LC_Sharp {
 					return result;
 				} else if (code.StartsWith("#")) {
 					return short.Parse(code.Substring(1));
-				} else if (code.StartsWith("X")) {
+				} else if (code.ToLower().StartsWith("x")) {
 					return short.Parse(code.Substring(1), System.Globalization.NumberStyles.HexNumber);
 				} else if (code.StartsWith("'")) {
 					if (code.Length == 3) {
@@ -657,6 +659,8 @@ namespace LC_Sharp {
 					} else {
 						Error($"Invalid character literal {code}");
 					}
+				} else {
+					Error($"Invalid .FILL value {code}");
 				}
 				return 0;
 			}
@@ -866,6 +870,14 @@ namespace LC_Sharp {
 			return name;
 		}
 	}
+	public class BR : Instruction {
+		private short flags;
+		public BR(string name, short flags) : base(name, 0, new[] { Operands.b000, Operands.LabelOffset9 }) {
+			this.flags = flags;
+		}
+		public override short Assemble(Assembler context, string[] args) => (short) (base.Assemble(context, args) | flags);
+		public override string Dissemble(Assembler context, short instruction) => base.Dissemble(context, instruction);
+	}
 	public class Instruction : Op {
 		public string name { get; private set; }
 		public short code { get; private set; }
@@ -877,7 +889,7 @@ namespace LC_Sharp {
 			this.code = code;
 			this.operands = operands;
 		}
-		public short Assemble(Assembler context, string[] args) {
+		public virtual short Assemble(Assembler context, string[] args) {
 			short bitIndex = 12;
 			short result = 0;
 			result |= (short)(code << bitIndex);
@@ -971,7 +983,7 @@ namespace LC_Sharp {
 			}
 			return result;
 		}
-		public string Dissemble(Assembler context, short instruction) {
+		public virtual string Dissemble(Assembler context, short instruction) {
 			short bitIndex = 12;
 			List<string> args = new List<string> { name };
 			foreach (Operands operand in operands) {
@@ -984,15 +996,15 @@ namespace LC_Sharp {
 						break;
 					case Operands.nzp:
 						bitIndex--;
-						if((instruction & (1 << bitIndex)) != 0) {
+						if ((instruction & (1 << bitIndex)) == (1 << bitIndex)) {
 							args[0] += 'n';
 						}
 						bitIndex--;
-						if ((instruction & (1 << bitIndex)) != 0) {
+						if ((instruction & (1 << bitIndex)) == (1 << bitIndex)) {
 							args[0] += 'z';
 						}
 						bitIndex--;
-						if ((instruction & (1 << bitIndex)) != 0) {
+						if ((instruction & (1 << bitIndex)) == (1 << bitIndex)) {
 							args[0] += 'p';
 						}
 						break;
@@ -1005,7 +1017,7 @@ namespace LC_Sharp {
 							bitIndex--;
 							if ((instruction & (1 << bitIndex)) != 0) {
 								bitIndex -= 5;
-								short imm5 = ((short) ((instruction >> bitIndex) & 0b11111)).signExtend(16);
+								short imm5 = ((short) ((instruction >> bitIndex) & 0b11111)).signExtend(5);
 								args.Add($"#{imm5.ToString()}");
 							} else {
 								bitIndex -= 2;
@@ -1015,34 +1027,34 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset9: {
 							bitIndex -= 9;
-							short offset9 = ((short)((instruction >> bitIndex) & 0b111111111)).signExtend(16);
+							short offset9 = ((short)((instruction >> bitIndex) & 0b111111111)).signExtend(9);
 							short dest = (short)(context.pc + offset9);
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset9.ToHexString());
+								args.Add(offset9.ToString());
 							}
 							break;
 						}
 					case Operands.LabelOffset6: {
 							bitIndex -= 6;
-							short offset6 = ((short)((instruction >> bitIndex) & 0b111111)).signExtend(16);
+							short offset6 = ((short)((instruction >> bitIndex) & 0b111111)).signExtend(6);
 							short dest = (short)(context.pc + offset6);
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset6.ToHexString());
+								args.Add(offset6.ToString());
 							}
 							break;
 						}
 					case Operands.LabelOffset11: {
 							bitIndex -= 11;
-							short offset11 = ((short)((instruction >> bitIndex) & 0b11111111111)).signExtend(16);
+							short offset11 = ((short)((instruction >> bitIndex) & 0b11111111111)).signExtend(11);
 							short dest = (short)(context.pc + offset11);
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
-								args.Add(offset11.ToHexString());
+								args.Add(offset11.ToString());
 							}
 							break;
 						}
