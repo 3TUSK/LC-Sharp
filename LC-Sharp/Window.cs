@@ -213,7 +213,6 @@ namespace LC_Sharp {
 			}
 		}
 		public void Run() {
-			//We execute TRAP instructions like regular subroutines but without updating the instruction highlight
 			lc3.Fetch();
 
 			if (lc3.control.ir == 0) {
@@ -223,7 +222,9 @@ namespace LC_Sharp {
 
 			lc3.Execute();
 
-			if(lc3.status != LC3.Status.TRAP) {
+			//We execute TRAP instructions like regular subroutines but without updating the instruction highlight
+			//Don't update if we just HALTed
+			if (lc3.Active && lc3.status != LC3.Status.TRAP) {
 				//Don't update the highlight if we're executing a subroutine
 				//Set the instructions pane to highlight the current PC
 				instructionPC = (ushort)lc3.control.pc; //Set highlighted instruction PC
@@ -231,9 +232,10 @@ namespace LC_Sharp {
 														//Use ushort because negative short values break the instruction highlight index
 				instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height / 2);
 				UpdateInstructionsView();
-			}
 
-			UpdateRegisterView();
+				//Also, don't show the register values rapidly changing during the subroutines
+				UpdateRegisterView();
+			}
 			UpdateIOView();
 		}
 		public void UpdateIOView() {
