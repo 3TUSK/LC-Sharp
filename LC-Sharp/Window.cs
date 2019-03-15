@@ -258,7 +258,9 @@ namespace LC_Sharp {
 			//DSR is waiting for output
 			if (lc3.memory.Read(dsr) == 0) {
 				char c = (char)lc3.memory.Read(ddr);        //Read char from DDR
-				output.Text = output.Text.ToString() + c;   //Send char to output window
+				if(c != 0) {
+					output.Text = output.Text.ToString() + c;   //Send char to output window
+				}
 				lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 			}
 		}
