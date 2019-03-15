@@ -275,7 +275,6 @@ namespace LC_Sharp {
 					output.Text = (output.Text.ToString().Substring(0, output.Text.Length - 2) + c);   //Send char to output window
 					output.SetNeedsDisplay();
 				}
-				lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 			}
 			lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 		}
