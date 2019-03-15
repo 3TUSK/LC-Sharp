@@ -4,6 +4,10 @@
 START		ST		R7, SaveR7
 			JSR		SaveReg
 		
+			AND		R0, R0, #0		; Modification for GUI-managed IO
+			ADD		R0, R0, #1		; Before we check KBSR for ready
+			STI		R0, KBSR		; Set KBSR to 1 to tell handler that we want input
+		
 Input		JSR		ReadChar
 			ADD		R2, R0, #0		; Move char to R2 for writing
 		
@@ -51,7 +55,12 @@ SaveR6		.FILL	x0000
 ; Write the character
 TryWrite	LDI		R1, DSR		; Get status
 			BRzp	TryWrite	; Bit 15 on says display is ready
+			
 WriteIt		STI		R0, DDR		; Write character
+
+			AND		R1, R1, #0	; Modification for GUI-managed IO
+			ADD		R1, R1, #1	; After writing output to DDR
+			STI		R1, DSR		; Set DSR to 1 to tell the handler that we have output
 
 ; Return from TRAP
 Return		LD		R1, SaveR1	; Restore registers

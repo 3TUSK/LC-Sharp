@@ -18,6 +18,7 @@ namespace LC_Sharp {
         Label[] registerLabels;
 		Label ccLabel;
         Label pcLabel, irLabel;
+		//Label dsrLabel, ddrLabel, kbsrLabel, kbdrLabel;
         private Button runAllButton;
 		private Button runStepOnceButton;
 		ushort instructionPC;
@@ -33,8 +34,8 @@ namespace LC_Sharp {
 			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
 			assembly.AssembleLines(
 				".ORIG x3000",
-				//"GETC",
-				//"OUT",
+				"GETC",
+				"OUT",
 				"LD R0, VALUE",
 				"JSR SUBROUTINE",
 				"JSR SUBROUTINE",
@@ -45,6 +46,8 @@ namespace LC_Sharp {
 				"SUBROUTINE ADD R0, R0, R0",
 				"RET"
 				);
+
+			Console.WriteLine("Program loaded");
 			Console.ReadLine();
 			Console.SetWindowSize(96, 48);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
@@ -60,7 +63,7 @@ namespace LC_Sharp {
 
 			registerLabels = new Label[8];
             for(int i = 0; i < 8; i++) {
-                registerLabels[i] = new Label(1, i, $"R{i+1}");
+                registerLabels[i] = new Label(1, i, $"R{i}");
             }
 
 			ccLabel = new Label(1, 9, "CC");
@@ -89,7 +92,7 @@ namespace LC_Sharp {
 			{
 				var w = new Window(new Rect(64, 0, 42, 22), "Output");
 				output = new TextView(new Rect(0, 0, 40, 20));
-				output.Text = "";
+				output.Text = "aaaaa";
 				output.ReadOnly = true;
 				w.Add(output);
 				window.Add(w);
@@ -102,6 +105,11 @@ namespace LC_Sharp {
 				w.Add(input);
 				window.Add(w);
 			}
+
+			UpdateRegisterView();
+			UpdateHighlight();
+			UpdateIOView();
+
 		}
 		public void ResetStatus() {
 			switch(lc3.status) {
@@ -118,6 +126,13 @@ namespace LC_Sharp {
 					status.Text = "ERROR".PadSurround(16, '-');
 					break;
 			}
+		}
+		public void UpdateHighlight() {
+			instructionPC = (ushort)lc3.control.pc; //Set highlighted instruction PC
+													//Show the highlighted instruction in the center
+													//Use ushort because negative short values break the instruction highlight index
+			instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height / 2);
+			UpdateInstructionsView();
 		}
 		public void UpdateInstructionsView() {
 			int start = -instructions.ContentOffset.Y;	//ContentOffset.Y is equal to the negative of the vertical scroll index
@@ -227,14 +242,7 @@ namespace LC_Sharp {
 			if (lc3.Active && lc3.status != LC3.Status.TRAP) {
 				//Don't update the highlight if we're executing a subroutine
 				//Set the instructions pane to highlight the current PC
-				instructionPC = (ushort)lc3.control.pc; //Set highlighted instruction PC
-														//Show the highlighted instruction in the center
-														//Use ushort because negative short values break the instruction highlight index
-				instructions.ContentOffset = new Point(0, instructionPC - instructions.Bounds.Height / 2);
-				UpdateInstructionsView();
-
-				//Also, don't show the register values rapidly changing during the subroutines
-				UpdateRegisterView();
+				UpdateHighlight();
 			}
 			UpdateIOView();
 		}
@@ -243,12 +251,15 @@ namespace LC_Sharp {
 			short kbdr = unchecked((short)0xFE02);
 
 			//See if KBSR is waiting for input
-			if (lc3.memory.Read(kbsr) == 0) {
+			if (lc3.memory.Read(kbsr) == 1) {
 				//Check if we have input ready
-				if (input.Text.Length > 0) {
+				//For some reason, the box text always contains two invisible newline characters
+				if (input.Text.Length > 2) {
 					lc3.memory.Write(kbsr, unchecked((short)0xFFFF));           //Set KBSR ready
 					lc3.memory.Write(kbdr, input.Text[0]);  //Write in the first character from input window
-					input.Text = input.Text.Substring(1);   //Consume the first character from input window
+					//For some reason, the box text always contains two newline characters
+					input.Text = input.Text.ToString().Substring(1, Math.Max(0, input.Text.Length - 3));   //Consume the first character from input window
+					input.SetNeedsDisplay();
 				}
 			}
 
@@ -258,13 +269,15 @@ namespace LC_Sharp {
 			short ddr = unchecked((short)0xFE06);
 
 			//DSR is waiting for output
-			if (lc3.memory.Read(dsr) == 0) {
+			if (lc3.memory.Read(dsr) == 1) {
 				char c = (char)lc3.memory.Read(ddr);        //Read char from DDR
 				if(c != 0) {
-					output.Text = output.Text.ToString() + c;   //Send char to output window
+					output.Text = (output.Text.ToString().Substring(0, output.Text.Length - 2) + c);   //Send char to output window
+					output.SetNeedsDisplay();
 				}
 				lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 			}
+			lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 		}
 		public void Init() {
             //Application.UseSystemConsole = true;
