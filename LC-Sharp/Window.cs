@@ -14,6 +14,9 @@ namespace LC_Sharp {
 		Assembler assembly;
 		Window window;
         ScrollView instructions;
+		private Button setPCbutton;
+		private TextField setPCfield;
+
 		Label status;
         Label[] registerLabels;
 		Label ccLabel;
@@ -25,7 +28,7 @@ namespace LC_Sharp {
 		private Button runStepOverButton;
 		ushort instructionPC;
 
-		TextView input, output;
+		TextView input, output, console;
 
 		//Note: Still need Run Step Over
 		bool running;
@@ -62,6 +65,26 @@ namespace LC_Sharp {
                 w.Add(instructions);
                 window.Add(w);
             }
+			setPCfield = new TextField(2, 42, 9, "");
+			setPCbutton = new Button(20, 42, "Set PC", () => {
+				try {
+					string s = setPCfield.Text.ToString().Trim().ToUpper();
+					short pc;
+					if(s.StartsWith("X")) {
+						pc = short.Parse(s, System.Globalization.NumberStyles.HexNumber);
+					} else {
+						pc = short.Parse(s);
+					}
+					lc3.control.setPC(pc);
+					console.Text = $"{console.Text}PC set to {pc.ToHexString()}";
+					UpdateRegisterView();
+					UpdateInstructionsView();
+				} catch(Exception e) {
+					console.Text = console.Text + e.Message;
+				}
+				
+			});
+			window.Add(setPCfield, setPCbutton);
 
 			registerLabels = new Label[8];
             for(int i = 0; i < 8; i++) {
@@ -108,6 +131,15 @@ namespace LC_Sharp {
 				input = new TextView(new Rect(0, 0, 40, 20));
 				input.Text = "";
 				w.Add(input);
+				window.Add(w);
+			}
+
+			{
+				var w = new Window(new Rect(62, 44, 42, 22), "Console");
+				console = new TextView(new Rect(0, 0, 40, 20));
+				console.Text = "";
+				console.ReadOnly = true;
+				w.Add(console);
 				window.Add(w);
 			}
 
