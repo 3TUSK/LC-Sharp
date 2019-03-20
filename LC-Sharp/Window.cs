@@ -62,7 +62,7 @@ namespace LC_Sharp {
 
 			Console.WriteLine("Program loaded");
 			Console.ReadLine();
-			Console.SetWindowSize(96, 48);
+			Console.SetWindowSize(109, 57);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
             instructions = new ScrollView(new Rect(0, 0, 30, 40), new Rect(0, 0, 30, 0xFFFF));
             instructions.ShowVerticalScrollIndicator = true;
@@ -75,8 +75,8 @@ namespace LC_Sharp {
             }
 
 			{
-				var w = new Window(new Rect(0, 42, 64, 16), "Debug");
-				assembleDebugField = new TextView(new Rect(0, 0, 62, 14));
+				var w = new Window(new Rect(0, 42, 64, 12), "Debug");
+				assembleDebugField = new TextView(new Rect(0, 0, 62, 10));
 				assembleDebugField.Text = "";
 				w.Add(assembleDebugField);
 				window.Add(w);
@@ -180,8 +180,8 @@ namespace LC_Sharp {
 			}
 
 			{
-				var w = new Window(new Rect(64, 32, 42, 16), "Console");
-				console = new TextView(new Rect(0, 0, 40, 14));
+				var w = new Window(new Rect(64, 32, 42, 22), "Console");
+				console = new TextView(new Rect(0, 0, 40, 20));
 				console.Text = "";
 				console.ReadOnly = true;
 				w.Add(console);
