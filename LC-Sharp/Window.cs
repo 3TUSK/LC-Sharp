@@ -192,12 +192,12 @@ namespace LC_Sharp {
 		public void UpdateRegisterView() {
 			for (int i = 0; i < 8; i++) {
 				var r = lc3.processing.registers[i];
-				registerLabels[i].Text = $"R{i} {r.ToRegisterString()}";
+				registerLabels[i].Text = $"R{i} {r.ToRegisterString()}".PadRight(30);
 			}
 			ccLabel.Text = $"CC {(lc3.processing.N ? 'N' : lc3.processing.Z ? 'Z' : lc3.processing.P ? 'P' : '?')}";
 
-			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
-			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
+			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}".PadRight(30);
+			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}".PadRight(30);
 
 			string text = "";
 			foreach(var label in assembly.labels.Keys) {

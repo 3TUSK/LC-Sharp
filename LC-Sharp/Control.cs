@@ -10,6 +10,7 @@ namespace LC_Sharp {
             pc = 0x3000;
             ir = 0;
         }
+		public void setPC(short pc) => this.pc = pc;
         public void ldPC() => pc = lc3.processing.pcmuxout;
         public void gatePC() => lc3.bus = pc;
         public void ldIR() => ir = lc3.bus;
