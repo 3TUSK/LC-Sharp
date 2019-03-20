@@ -167,7 +167,12 @@ namespace LC_Sharp {
 			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
 			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
 
-			
+			string text = "";
+			foreach(var label in assembly.labels.Keys) {
+				short location = assembly.labels[label];
+				text += $"{location.ToHexString()} {label} {lc3.memory.Read(location).ToRegisterString()}\n";
+			}
+			labels.Text = text;
 		}
 
 		public static Attribute MakeColor(ConsoleColor f) {
