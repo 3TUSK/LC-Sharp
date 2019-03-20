@@ -18,9 +18,11 @@ namespace LC_Sharp {
         Label[] registerLabels;
 		Label ccLabel;
         Label pcLabel, irLabel;
+		TextView labels;
 		//Label dsrLabel, ddrLabel, kbsrLabel, kbdrLabel;
         private Button runAllButton;
 		private Button runStepOnceButton;
+		private Button runStepOverButton;
 		ushort instructionPC;
 
 		TextView input, output;
@@ -77,17 +79,20 @@ namespace LC_Sharp {
                 w.Add(pcLabel, irLabel);
                 window.Add(w);
             }
-            Window labels = new Window(new Rect(32, 16, 32, 16), "Labels");
-            window.Add(labels);
+            Window labelsView = new Window(new Rect(32, 16, 32, 16), "Labels");
+			labels = new TextView(new Rect(0, 0, 30, 14)) { Text = "", ReadOnly = true };
+			labelsView.Add(labels);
+            window.Add(labelsView);
 
 			status = new Label(new Rect(32, 32, 16, 4), "");
 			ResetStatus();
 			window.Add(status);
 
             runAllButton = new Button(32, 33, "Run All", ClickRunAll);
-			runStepOnceButton = new Button(32, 34, "Run Step", ClickRunStep);
-			window.Add(runAllButton);
-			window.Add(runStepOnceButton);
+			runStepOnceButton = new Button(32, 34, "Run Step Once", ClickRunStepOnce);
+			runStepOverButton = new Button(32, 35, "Run Step Over", ClickRunStepOver);
+			
+			window.Add(runAllButton, runStepOnceButton, runStepOverButton);
 
 			{
 				var w = new Window(new Rect(64, 0, 42, 22), "Output");
@@ -161,6 +166,8 @@ namespace LC_Sharp {
 
 			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
 			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
+
+			
 		}
 
 		public static Attribute MakeColor(ConsoleColor f) {
@@ -197,34 +204,69 @@ namespace LC_Sharp {
 			}
 			
         }
-		public void ClickRunStep() {
+		public void ClickRunStepOnce() {
 			if (running) {
-				StopRunStep();
+				StopRunStepOnce();
 			} else {
 				//we don't run if the lc3 is halted
 				if (!lc3.Active)
 					return;
 				running = true;
-				Application.MainLoop.AddIdle(RunStep);
-				runStepOnceButton.Text = "Pause Run Step";
-				status.Text = "Running Step".PadSurround(16, '-');
+				Application.MainLoop.AddIdle(RunStepOnce);
+				runStepOnceButton.Text = "Pause Run Step Once";
+				status.Text = "Running Step Once".PadSurround(16, '-');
+			}
+			void StopRunStepOnce() {
+				running = false;
+				Application.MainLoop.RemoveIdle(RunStepOnce);
+				runStepOnceButton.Text = "Run Step Once";
+				ResetStatus();
+			}
+			bool RunStepOnce() {
+				Run();
+				//If we are running a TRAP instruction, we should wait for it to finish
+				if (lc3.status == LC3.Status.TRAP) {
+					ResetStatus();
+					return true;
+				} else {
+					StopRunStepOnce();
+					return false;
+				}
 			}
 		}
-		public void StopRunStep() {
-			running = false;
-			Application.MainLoop.RemoveIdle(RunStep);
-			runStepOnceButton.Text = "Run Step";
-			ResetStatus();
-		}
-		public bool RunStep() {
-			Run();
-			//If we are running a TRAP instruction, we should wait for it to finish
-			if (lc3.status == LC3.Status.TRAP) {
-				ResetStatus();
-				return true;
+		public void ClickRunStepOver() {
+
+			int pcDest = lc3.control.pc;
+			if (running) {
+				StopRunStepOver();
 			} else {
-				StopRunStep();
-				return false;
+				//we don't run if the lc3 is halted
+				if (!lc3.Active)
+					return;
+				running = true;
+				Application.MainLoop.AddIdle(RunStepOver);
+				runStepOverButton.Text = "Pause Run Step Over";
+				status.Text = "Running Step Over".PadSurround(16, '-');
+			}
+
+			void StopRunStepOver() {
+				running = false;
+				Application.MainLoop.RemoveIdle(RunStepOver);
+				runStepOverButton.Text = "Run Step Over";
+				ResetStatus();
+			}
+			bool RunStepOver() {
+				Run();
+				//If we are running a TRAP instruction, we should wait for it to finish
+				if (lc3.status == LC3.Status.TRAP) {
+					ResetStatus();
+					return true;
+				} else if (lc3.control.pc != pcDest) {
+					return true;
+				} else {
+					StopRunStepOver();
+					return false;
+				}
 			}
 		}
 		public void Run() {
@@ -287,8 +329,6 @@ namespace LC_Sharp {
             top.Add(window);
             Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(1000/60), _ => true); //Hack to keep the window updating without touching the keyboard or mouse
             Application.Run(window);
-
-            instructions.CanFocus = true;
 		}
     }
 }
