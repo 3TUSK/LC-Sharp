@@ -518,6 +518,13 @@ namespace LC_Sharp {
 				if (ops.TryCode(instruction, out Op result))
 					return result.Dissemble(this, instruction);
 				return instruction.ToRegisterString();
+			} else if((instruction & 0xF000) == 0x4000) {
+				//Special case: check JSR/JSRR flag since they have the same opcode
+				if((instruction & 0x0800) != 0) {
+					return ops.Name("JSR").Dissemble(this, instruction);
+				} else {
+					return ops.Name("JSRR").Dissemble(this, instruction);
+				}
 			} else if ((instruction & 0xFE00) == 0) {
 				return "NOP";
 			} else {
