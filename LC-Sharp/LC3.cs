@@ -1075,6 +1075,7 @@ namespace LC_Sharp {
 							bitIndex -= 9;
 							short offset9 = ((short)((instruction >> bitIndex) & 0b111111111)).signExtend(9);
 							short dest = (short)(context.pc + offset9);
+							dest++;
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
@@ -1086,6 +1087,7 @@ namespace LC_Sharp {
 							bitIndex -= 6;
 							short offset6 = ((short)((instruction >> bitIndex) & 0b111111)).signExtend(6);
 							short dest = (short)(context.pc + offset6);
+							dest++;
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
@@ -1097,6 +1099,7 @@ namespace LC_Sharp {
 							bitIndex -= 11;
 							short offset11 = ((short)((instruction >> bitIndex) & 0b11111111111)).signExtend(11);
 							short dest = (short)(context.pc + offset11);
+							dest++;
 							if (context.Lookup(dest, out string label)) {
 								args.Add(label);
 							} else {
