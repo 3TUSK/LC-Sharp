@@ -573,7 +573,7 @@ namespace LC_Sharp {
 				case ".END": {
 						passing = false;
 						SecondPass();
-						ClearLabels();
+						//ClearLabels();
 						Print($"Line {reader.line}: End of file");
 						break;
 					}
