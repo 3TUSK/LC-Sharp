@@ -210,40 +210,35 @@ PUTSP_BEGIN   ST R0, PUTSP_SAV_R0
               ST R7, PUTSP_SAV_R7
 
 PUTSP_LOOP    LDR R1, R0, #0
-              BRn PUTSP_END        ; Zero-terminated string ends at zero.
-
+              BRN PUTSP_END        ; Zero-terminated string ends at zero.
               LD R3, PUTSP_L_MASK  ; Load the lower-nibble mask 0x00FF 
               AND R2, R1, R3       ; Get the bits on [7:0]
 PUTSP_WAIT1   LDI R3, PUTSP_DSR
-              BRzp PUTSP_WAIT1     ; Wait until DSR is flagged as ready
+              BRZP PUTSP_WAIT1     ; Wait until DSR is flagged as ready
               STI R2, PUTSP_DDR
-			  
-			  AND R3, R3, #0	; Modification for GUI-managed IO
-			  ADD R3, R3, #1	; After writing output to DDR
-			  STI R3, PUTSP_DSR	; Set DSR to 1 to tell the handler that we have output
-			  
+              AND R3, R3, #0       ; Modification for GUI-managed IO
+              ADD R3, R3, #1       ; After writing output to DDR
+              STI R3, PUTSP_DSR    ; Set DSR to 1 to tell the handler that we have output
               LD R3, PUTSP_H_MASK  ; Load the higher-nibble mask 0xFF00
               AND R2, R1, R3       ; Get the bits on [15:8]. Caution, they still stay at [15:8] in R2 right now!
-              BRz PUTSP_END        ; If the higher-nibble is zero, then the whole thing is zero as well, meaning we should terminate here.
+              BRZ PUTSP_END        ; If the higher-nibble is zero, then the whole thing is zero as well, meaning we should terminate here.
               AND R3, R3, #0       ; Clear R3 again, we need to re-use R3 for a counter
               ADD R3, R3, #8       ; A for-loop that iterates 8 times
 PUTSP_FLIP    ADD R3, R3, #-1      ; Decrease counter by 1
               ADD R2, R2, #0       ; Touch R2 so we can examine it
-              BRp PUTSP_LSHF
+              BRP PUTSP_LSHF
               ADD R2, R2, #1       ; Rotate the MSB to the LSB if MSB is 1
 PUTSP_LSHF    ADD R2, R2, R2       ; R2 <- R2 * 2, i.e. left-shift by 1 bit
               ADD R3, R3, #0       ; Touch R3
-              BRp PUTSP_FLIP
+              BRP PUTSP_FLIP
 PUTSP_WAIT2   LDI R3, PUTSP_DSR
-              BRzp PUTSP_WAIT2
+              BRZP PUTSP_WAIT2
               STI R2, PUTSP_DDR
-			  
-			  AND R3, R3, #0	   ; Modification for GUI-managed IO
-			  ADD R3, R3, #1	   ; After writing output to DDR
-			  STI R3, PUTSP_DSR	   ; Set DSR to 1 to tell the handler that we have output
-			  
+              AND R3, R3, #0       ; Modification for GUI-managed IO
+              ADD R3, R3, #1       ; After writing output to DDR
+              STI R3, PUTSP_DSR    ; Set DSR to 1 to tell the handler that we have output
               ADD R0, R0, #1       ; Move pointer in R0 to the next index
-              BRnzp PUTSP_LOOP     ; Unconditionally go back to the loop begin
+              BRNZP PUTSP_LOOP     ; Unconditionally go back to the loop begin
               
 PUTSP_END     LD R0, PUTSP_SAV_R0
               LD R1, PUTSP_SAV_R1
