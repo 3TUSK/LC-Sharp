@@ -1000,13 +1000,11 @@ namespace LC_Sharp {
 							if (arg == null) {
 								context.Error($"Missing operand in {args}");
 							}
-							if (!context.Immediate(arg, 5, out short imm5)) {
-								context.Error($"Imm5 value expected: {arg}");
+							if (!context.Immediate(arg, 6, out short imm6)) {
+								context.Error($"Imm6 value expected: {arg}");
 							} else {
-								bitIndex--;
-								result |= (short)(1 << bitIndex);
-								bitIndex -= 5;
-								result |= (short)((imm5 & 0b111111) << bitIndex);
+								bitIndex -= 6;
+								result |= (short)((imm6 & 0b111111) << bitIndex);
 							}
 							index++;
 							break;
@@ -1083,6 +1081,11 @@ namespace LC_Sharp {
 								bitIndex -= 5;
 								args.Add($"R{(instruction >> bitIndex) & 0b111}");
 							}
+							break;
+						}
+					case Operands.Imm6: {
+							bitIndex -= 6;
+							args.Add($"#{((short) ((instruction >> bitIndex) & 0b111111)).signExtend(6).ToString()}");
 							break;
 						}
 					case Operands.LabelOffset9: {
