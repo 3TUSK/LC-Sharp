@@ -95,8 +95,17 @@ lcs cli {program_file} [input_file] [output_file] - launches LC-Sharp in headles
 - Output
   - If we have an output file, then we write all output to it.
   - Otherwise, output is printed to console
+
 # Macros
-- Custom TRAP Subroutines
-# Compiling
+- Custom TRAP Subroutines support - `.TRAP`
+
+# Compiling (TODO: We need a minimum compilation guide)
 - Install Visual Studio Community 2017
 - We require a modified GUI library available at [INeedAUniqueUsername/gui.cs](https://github.com/INeedAUniqueUsername/gui.cs)
+
+# Unicode support
+  - In LC-Sharp, the upper nibble (`[15:8]`) of Display Data Register (DDR, `xFE06`) is also reserved. That said, character written in the whole DDR will be displayed on the screen.
+    - In the original LC-3 ISA, only the lower nibble (`[7:0]`) has defined behavior; the behavior for `[15:8]` is undefined.
+    - This change is backward compatible, since the first unicode plane is "compatible" with ASCII.
+    - This effectively expands the range of support characters from ASCII to first 256 unicode planes (i.e. 0x0000 to 0xFFFF).
+    - No plan for further unicode support due to word size of 16 bit. 
