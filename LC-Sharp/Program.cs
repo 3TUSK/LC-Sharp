@@ -1,6 +1,7 @@
-﻿using System;
+﻿using CommandLine;
+using System;
 using System.IO;
-using CommandLine;
+
 
 namespace LC_Sharp {
     class Program {
@@ -14,7 +15,17 @@ namespace LC_Sharp {
 					err => // Fall back to GUI directly if not parsed.
 					{
 						// TODO (3TUSK): Warn users about not using `lc3 gui`?
-						new Emulator().Init();
+						var lc3 = new LC3();
+						var assembly = new Assembler(lc3);
+						assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+						assembly.AssembleLines(
+							".ORIG x3000",
+							"B",
+							"GETC",
+							"OUT",
+							"JSR B"
+							);
+						new Terminal(lc3, assembly, "abc", "abc").Start();
 						return 0;
 					}
 				);
@@ -26,7 +37,7 @@ namespace LC_Sharp {
 			[Value(0, MetaName = "Program Source", HelpText = "Program file to be loaded")]
 			public string program { get; set; }
 			
-			[Option("input", HelpText = "Can be used to redirect input stream, default to stdin.")]
+			[Option("input", HelpText = "Set input to the contents of a given file.")]
 			public string input { get; set; }
 			
 			[Option("output", HelpText = "Can be used to redirect output stream, defualt to stdout.")]
@@ -39,44 +50,32 @@ namespace LC_Sharp {
 			[Value(0, MetaName = "Program Source", HelpText = "Program file to be loaded")]
 			public string program { get; set; }
 			
-			[Option("input", HelpText = "Can be used to redirect input stream, default to stdin.")]
+			[Option("input", HelpText = "Set input to the contents of a given file.")]
 			public string input { get; set; }
 			
-			[Option("output", HelpText = "Can be used to redirect output stream, defualt to stdout.")]
+			[Option("output", HelpText = "Expect output according to the contents of a given file.")]
 			public string output { get; set; }
 		}
 		
 		private static int GraphicUserInterfaceMain(GraphicUserInterfaceOptions options)
 		{
-			new Emulator().Init();
+			LC3 lc3 = new LC3();
+			Assembler assembly = new Assembler(lc3);
+			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleLines(File.ReadAllLines(options.program));
+			new Emulator(lc3, assembly).Start();
 			return 0;
 		}
 
 		private static int CommandLineMain(CommandLineOptions options)
 		{
-			var fsm = new LC3();
-			var assembly = new Assembler(fsm);
-			var insns = new[]
-			{
-				".ORIG x3000",
-				"LEA R0, HELLO_WORLD",
-				"PUTS",
-				"LD R0, FOO",
-				"ADD R0, R0, #15",
-				"NOT R0, R0",
-				"ST R0, FOO",
-				"HALT",
-				"HELLO_WORLD .STRINGZ \"HELLO, WORLD\"",
-				"FOO .FILL #2333"
-			};
-			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
-			assembly.AssembleToPC(insns);
-			Console.WriteLine("Assemble finish, launching LC3 Finite State Machine...");
-			while (fsm.Active)
-			{
-				fsm.Fetch();
-				fsm.Execute();
-			}
+			var lc3 = new LC3();
+			var assembly = new Assembler(lc3);
+			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleToPC(File.ReadAllLines(options.program));
+			Console.WriteLine("Assembly successful, launching LC3 Finite State Machine...");
+			Console.CursorVisible = false;
+			new Terminal(lc3, assembly).Start();
 			Console.WriteLine("LC3 Finite State Machine halted without exception.");
 			return 0;
 		}
