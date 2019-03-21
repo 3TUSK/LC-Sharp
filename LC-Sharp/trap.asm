@@ -87,7 +87,13 @@ Loop		LDR		R1, R0, #0	; Retrieve the character(s)
 			BRz		Return		; If it is 0, done
 L2			LDI		R3, DSR
 			BRzp	L2
+			
 			STI		R1, DDR		; Write the character
+			
+			AND		R3, R3, #0	; Modification for GUI-managed IO
+			ADD		R3, R3, #1	; After writing output to DDR
+			STI		R3, DSR		; Set DSR to 1 to tell the handler that we have output
+			
 			ADD		R0, R0, #1	; Increment pointer
 			BRnzp Loop			; Do it all over again
 			
@@ -140,12 +146,23 @@ Prompt		.STRINGZ	"Input a character>"
 
 WriteChar	LDI		R3, DSR
 			BRzp	WriteChar
+			
 			STI		R2, DDR
+			
+			AND		R3, R3, #0	; Modification for GUI-managed IO
+			ADD		R3, R3, #1	; After writing output to DDR
+			STI		R3, DSR		; Set DSR to 1 to tell the handler that we have output
+			
 			RET						; JMP R7 terminates subroutine
 DSR			.FILL	xFE04
 DDR			.FILL	xFE06
 
 ReadChar	LDI		R3, KBSR
+
+			AND		R3, R3, #0		; Modification for GUI-managed IO
+			ADD		R3, R3, #1		; Before we check KBSR for ready
+			STI		R3, KBSR		; Set KBSR to 1 to tell handler that we want input
+
 			BRzp	ReadChar
 			LDI		R0, KBDR
 			RET
@@ -174,7 +191,7 @@ SaveR4		.FILL	x0000
 SaveR5		.FILL	x0000
 SaveR6		.FILL	x0000
 			;.END
-
+		
 ;------------------------------------------------------------------
 ; This service routine writes a NULL-terminated string to the console.
 ; Differing from PUTS, PUTSP consider one 16-bit word as containing two
@@ -193,29 +210,40 @@ PUTSP_BEGIN   ST R0, PUTSP_SAV_R0
               ST R7, PUTSP_SAV_R7
 
 PUTSP_LOOP    LDR R1, R0, #0
-              BRN PUTSP_END        ; Zero-terminated string ends at zero.
+              BRn PUTSP_END        ; Zero-terminated string ends at zero.
+
               LD R3, PUTSP_L_MASK  ; Load the lower-nibble mask 0x00FF 
               AND R2, R1, R3       ; Get the bits on [7:0]
 PUTSP_WAIT1   LDI R3, PUTSP_DSR
-              BRZP PUTSP_WAIT1     ; Wait until DSR is flagged as ready
+              BRzp PUTSP_WAIT1     ; Wait until DSR is flagged as ready
               STI R2, PUTSP_DDR
+			  
+			  AND R3, R3, #0	; Modification for GUI-managed IO
+			  ADD R3, R3, #1	; After writing output to DDR
+			  STI R3, PUTSP_DSR	; Set DSR to 1 to tell the handler that we have output
+			  
               LD R3, PUTSP_H_MASK  ; Load the higher-nibble mask 0xFF00
               AND R2, R1, R3       ; Get the bits on [15:8]. Caution, they still stay at [15:8] in R2 right now!
-              BRZ PUTSP_END        ; If the higher-nibble is zero, then the whole thing is zero as well, meaning we should terminate here.
+              BRz PUTSP_END        ; If the higher-nibble is zero, then the whole thing is zero as well, meaning we should terminate here.
               AND R3, R3, #0       ; Clear R3 again, we need to re-use R3 for a counter
               ADD R3, R3, #8       ; A for-loop that iterates 8 times
 PUTSP_FLIP    ADD R3, R3, #-1      ; Decrease counter by 1
               ADD R2, R2, #0       ; Touch R2 so we can examine it
-              BRP PUTSP_LSHF
+              BRp PUTSP_LSHF
               ADD R2, R2, #1       ; Rotate the MSB to the LSB if MSB is 1
 PUTSP_LSHF    ADD R2, R2, R2       ; R2 <- R2 * 2, i.e. left-shift by 1 bit
               ADD R3, R3, #0       ; Touch R3
-              BRP PUTSP_FLIP
+              BRp PUTSP_FLIP
 PUTSP_WAIT2   LDI R3, PUTSP_DSR
-              BRZP PUTSP_WAIT2
+              BRzp PUTSP_WAIT2
               STI R2, PUTSP_DDR
+			  
+			  AND R3, R3, #0	   ; Modification for GUI-managed IO
+			  ADD R3, R3, #1	   ; After writing output to DDR
+			  STI R3, PUTSP_DSR	   ; Set DSR to 1 to tell the handler that we have output
+			  
               ADD R0, R0, #1       ; Move pointer in R0 to the next index
-              BRNZP PUTSP_LOOP     ; Unconditionally go back to the loop begin
+              BRnzp PUTSP_LOOP     ; Unconditionally go back to the loop begin
               
 PUTSP_END     LD R0, PUTSP_SAV_R0
               LD R1, PUTSP_SAV_R1
@@ -236,42 +264,41 @@ PUTSP_SAV_R7 .FILL        #0
 
 ;------------------------------------------------------------------
 			
-.ORIG xFD70			; Where this routine resides
-.TRAP HALT
-ST R7, SaveR7
-ST R1, SaveR1		; R1: a temp for MC register
-ST R0, SaveRO		; R0 is used as working space
+			.ORIG xFD70			; Where this routine resides
+			.TRAP HALT
+			ST 		R7, SaveR7
+			ST 		R1, SaveR1		; R1: a temp for MC register
+			ST 		R0, SaveRO		; R0 is used as working space
 
-; print message that machine is halting
+			; print message that machine is halting
 
-LD R0, ASCIINewLine
-OUT
-LEA R0, Message
-PUTS
-LD R0, ASCIINewLine
-OUT
+			LD		R0, ASCIINewLine
+			OUT
+			LEA 	R0, Message
+			PUTS
+			LD 		R0, ASCIINewLine
+			OUT
 
-; clear bit 15 at xFFFE to stop the machine
-LDI R1, MCR			; Load MC register into R1
-LD R0, MASK			; R0 = X7FFF
-AND R0, R1, R0		; Mask to clear the top bit
-STI R0, MCR			; Store R0 into MC register
+			; clear bit 15 at xFFFE to stop the machine
+			LDI 	R1, MCR			; Load MC register into R1
+			LD 		R0, MASK			; R0 = X7FFF
+			AND 	R0, R1, R0		; Mask to clear the top bit
+			STI 	R0, MCR			; Store R0 into MC register
 
-; return from HALT routine.
-; (how can this routine return if the machine is halted above?
+			; return from HALT routine.
+			; (how can this routine return if the machine is halted above?
 
-LD R1, SaveR1 			; Restore registers
-LD R0, SaveRO
-LD R7, SaveR7
-RET					; JMP R7, actually
-
+			LD	R1, SaveR1 			; Restore registers
+			LD	R0, SaveRO
+			LD	R7, SaveR7
+			RET					; JMP R7, actually
 ; Some constants
 
 ASCIINewLine .FILL x000A
-SaveRO .BLKW 1
-SaveR1 .BLKW 1
-SaveR7 .BLKW 1
-Message .STRINGZ "Halting the machine."
-MCR .FILL xFFFE ; Address of MCR
-MASK .FILL X7FFF ; Mask to clear the top bit
+SaveRO		.BLKW 1
+SaveR1		.BLKW 1
+SaveR7		.BLKW 1
+Message 	.STRINGZ "Halting the machine."
+MCR 		.FILL xFFFE ; Address of MCR
+MASK 		.FILL X7FFF ; Mask to clear the top bit
 .END
