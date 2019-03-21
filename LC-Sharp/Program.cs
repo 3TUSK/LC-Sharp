@@ -18,14 +18,8 @@ namespace LC_Sharp {
 						var lc3 = new LC3();
 						var assembly = new Assembler(lc3);
 						assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
-						assembly.AssembleLines(
-							".ORIG x3000",
-							"B",
-							"GETC",
-							"OUT",
-							"JSR B"
-							);
-						new Terminal(lc3, assembly, "abc", "abc").Start();
+						assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
+						new Emulator(lc3, assembly).Start();
 						return 0;
 					}
 				);
