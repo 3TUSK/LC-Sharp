@@ -192,7 +192,7 @@ PUTSP_BEGIN   ST R0, PUTSP_SAV_R0
               ST R3, PUTSP_SAV_R3
               ST R7, PUTSP_SAV_R7
 
-PUTSP_LOOP    LDI R1, R0
+PUTSP_LOOP    LDR R1, R0, #0
               BRN PUTSP_END        ; Zero-terminated string ends at zero.
               LD R3, PUTSP_L_MASK  ; Load the lower-nibble mask 0x00FF 
               AND R2, R1, R3       ; Get the bits on [7:0]
