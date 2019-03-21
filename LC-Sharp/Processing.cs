@@ -92,14 +92,16 @@ namespace LC_Sharp {
             aluA
             );
         public void PrintMux() {
-            Console.WriteLine($"Addr1Mux: {addr1mux.ToString()}");
+#if print
+			Console.WriteLine($"Addr1Mux: {addr1mux.ToString()}");
             Console.WriteLine($"Addr1: 0x{addr1.ToString("X")}");
             Console.WriteLine($"Addr2Mux: {addr2mux.ToString()}");
             Console.WriteLine($"Addr2: 0x{addr2.ToString("X")}");
             Console.WriteLine($"AddrAdd: 0x{addradd.ToString("X")}");
             Console.WriteLine($"PCMux: 0x{pcmuxout.ToString("X")}");
-        }
-        public void ldReg() {
+#endif
+		}
+		public void ldReg() {
             short n = (short) lc3.bus;
             registers[dr] = n;
             N = n < 0;
@@ -109,7 +111,8 @@ namespace LC_Sharp {
         public void gateALU() => lc3.bus = alu;
 
         public void DebugPrint() {
-            Console.WriteLine($"R0: {registers[0]}");
+#if print
+			Console.WriteLine($"R0: {registers[0]}");
             Console.WriteLine($"R1: {registers[1]}");
             Console.WriteLine($"R2: {registers[2]}");
             Console.WriteLine($"R3: {registers[3]}");
@@ -120,6 +123,7 @@ namespace LC_Sharp {
             Console.WriteLine($"N: {N}");
             Console.WriteLine($"Z: {Z}");
             Console.WriteLine($"P: {P}");
+#endif
         }
     }
     

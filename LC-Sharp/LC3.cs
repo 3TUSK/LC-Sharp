@@ -57,7 +57,7 @@ namespace LC_Sharp {
 						(processing.P && (instruction & 0x0200) > 0)) {
 						control.ldPC();
 					}
-					Console.WriteLine("Executed BR");
+					//Console.WriteLine("Executed BR");
 					break;
 				case 0b0001:
 					//ADD
@@ -66,25 +66,25 @@ namespace LC_Sharp {
 						processing.sr1mux = Processing.SR1MUX.ir8_6;
 						processing.sr2mux = Processing.SR2MUX.sr2out;
 						processing.aluk = Processing.ALUK.add;
-						Console.WriteLine($"ALUA: {processing.aluA}");
-						Console.WriteLine($"ALUB: {processing.aluB}");
-						Console.WriteLine($"ALU: {processing.alu}");
+						//Console.WriteLine($"ALUA: {processing.aluA}");
+						//Console.WriteLine($"ALUB: {processing.aluB}");
+						//Console.WriteLine($"ALU: {processing.alu}");
 						processing.gateALU();
 						processing.drmux = Processing.DRMUX.ir11_9;
 						processing.ldReg();
-						Console.WriteLine("Executed ADD Register");
+						//Console.WriteLine("Executed ADD Register");
 					} else {
 						//Immediate mode
 						processing.sr1mux = Processing.SR1MUX.ir8_6;
 						processing.sr2mux = Processing.SR2MUX.ir5;
 						processing.aluk = Processing.ALUK.add;
-						Console.WriteLine($"ALUA: {processing.aluA}");
-						Console.WriteLine($"ALUB: {processing.aluB}");
-						Console.WriteLine($"ALU: {processing.alu}");
+						//Console.WriteLine($"ALUA: {processing.aluA}");
+						//Console.WriteLine($"ALUB: {processing.aluB}");
+						//Console.WriteLine($"ALU: {processing.alu}");
 						processing.gateALU();
 						processing.drmux = Processing.DRMUX.ir11_9;
 						processing.ldReg();
-						Console.WriteLine("Executed ADD Immediate");
+						//Console.WriteLine("Executed ADD Immediate");
 					}
 					break;
 				case 0b0010:
@@ -98,7 +98,7 @@ namespace LC_Sharp {
 					memory.gateMDR();
 					processing.drmux = Processing.DRMUX.ir11_9;
 					processing.ldReg();
-					Console.WriteLine("Executed LD");
+					//Console.WriteLine("Executed LD");
 					break;
 				case 0b0011:
 					//ST
@@ -112,7 +112,7 @@ namespace LC_Sharp {
 					processing.gateALU();
 					memory.ldMDR();
 					memory.memEnW();
-					Console.WriteLine("Executed ST");
+					//Console.WriteLine("Executed ST");
 					break;
 				case 0b0100:
 					if ((instruction & 0x0800) != 0) {
@@ -124,7 +124,7 @@ namespace LC_Sharp {
 						processing.addr2mux = Processing.ADDR2MUX.ir11;
 						processing.pcmux = Processing.PCMUX.addrAdd;
 						control.ldPC();
-						Console.WriteLine("Executed JSR");
+						//Console.WriteLine("Executed JSR");
 					} else {
 						//JSRR
 						control.gatePC();
@@ -135,7 +135,7 @@ namespace LC_Sharp {
 						processing.addr2mux = Processing.ADDR2MUX.b0;
 						processing.pcmux = Processing.PCMUX.addrAdd;
 						control.ldPC();
-						Console.WriteLine("Executed JSRR");
+						//Console.WriteLine("Executed JSRR");
 					}
 
 					break;
@@ -580,7 +580,7 @@ namespace LC_Sharp {
 				case ".END": {
 						passing = false;
 						SecondPass();
-						//ClearLabels();
+						ClearLabels();
 						Print($"Line {reader.line}: End of file");
 						break;
 					}
@@ -773,10 +773,11 @@ namespace LC_Sharp {
 			}
 			*/
 			labels.Clear();
-			labelsReverse.Clear();
+			//We allow limited label reuse and identification by preserving the location-to-label map
+			//labelsReverse.Clear();
 		}
-
-		public void Print(string message) => Console.WriteLine(message);
+		public static bool print = false;
+		public void Print(string message) { if(print) Console.WriteLine(message); }
 		//Calculates the PC-offset from the given label and verifies that it fits within a given size
 		public short Offset(string label, int size) {
 			ushort mask = (ushort)(0xFFFF >> (16 - size));    //All ones
@@ -795,7 +796,7 @@ namespace LC_Sharp {
 				}
 			} else {
 				foreach (var l in labels.Keys)
-					Console.WriteLine(l);
+					//Console.WriteLine(l);
 				//Otherwise, we don't accept this label
 				Error($"Unknown label '{label}'");
 			}
@@ -813,7 +814,7 @@ namespace LC_Sharp {
 			throw new Exception(reader.GetContextString(message));
 		}
 		public void PrintLabels() {
-			labels.Keys.ToList().ForEach(label => Console.WriteLine($"{labels[label]} => {label}"));
+			//labels.Keys.ToList().ForEach(label => Console.WriteLine($"{labels[label]} => {label}"));
 		}
 		//Create a label at the current line
 		public void Label(string label) {
