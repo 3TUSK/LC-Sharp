@@ -989,7 +989,8 @@ namespace LC_Sharp {
 									result |= (short)((imm5 & 0b111111) << bitIndex);
 								}
 							} else {
-								bitIndex -= 3;
+								//Shift 3 more since it was being stored in the flag's place
+								bitIndex -= 6;
 								result |= (short)(reg << bitIndex);
 							}
 							index++;
@@ -1078,7 +1079,8 @@ namespace LC_Sharp {
 								short imm5 = ((short) ((instruction >> bitIndex) & 0b11111)).signExtend(5);
 								args.Add($"#{imm5.ToString()}");
 							} else {
-								bitIndex -= 2;
+								//Shift 3 more since we were reading the flag's place
+								bitIndex -= 5;
 								args.Add($"R{(instruction >> bitIndex) & 0b111}");
 							}
 							break;
