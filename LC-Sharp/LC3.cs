@@ -862,10 +862,10 @@ namespace LC_Sharp {
 		}
 		public void Add(Op op) {
 			ops.Add(op);
-			byName[op.name] = op;
+			byName[op.name.ToUpper()] = op;
 			byCode[op.code] = op;
 		}
-		public bool TryName(string name, out Op result) => byName.TryGetValue(name, out result);
+		public bool TryName(string name, out Op result) => byName.TryGetValue(name.ToUpper(), out result);
 		public bool TryCode(short code, out Op result) => byCode.TryGetValue(code, out result);
 		public Op Name(string name) => byName[name];
 		public Op Code(short code) => byCode[code];
