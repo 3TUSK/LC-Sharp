@@ -73,9 +73,11 @@ namespace LC_Sharp {
 			var assembly = new Assembler(lc3);
 			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
 			assembly.AssembleToPC(File.ReadAllLines(options.program));
+			string input = options.input != null ? File.ReadAllText(options.input) : null;
+			string output = options.output != null ? File.ReadAllText(options.output) : null;
 			Console.WriteLine("Assembly successful, launching LC3 Finite State Machine...");
 			Console.CursorVisible = false;
-			new Terminal(lc3, assembly).Start();
+			new Terminal(lc3, assembly, input, output).Start();
 			Console.WriteLine("LC3 Finite State Machine halted without exception.");
 			return 0;
 		}

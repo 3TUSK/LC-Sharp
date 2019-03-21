@@ -636,6 +636,8 @@ namespace LC_Sharp {
 								Error("Expected string value");
 								return;
 						}
+						//Handle escape chars
+						s = s.Replace("\\n", "\n");
 						for (int i = 0; i < s.Length; i++) {
 							nonInstruction.Add((short)(pc - 1));
 							lc3.memory.Write((short)(pc - 1), (short)s[i]);
@@ -695,6 +697,8 @@ namespace LC_Sharp {
 				} else if (code.ToLower().StartsWith("x")) {
 					return short.Parse(code.Substring(1), System.Globalization.NumberStyles.HexNumber);
 				} else if (code.StartsWith("'")) {
+					//Handle escape chars
+					code = code.Replace("\\n", "\n");
 					if (code.Length == 3) {
 						return (short)code[1];
 					} else {
