@@ -38,28 +38,23 @@ namespace LC_Sharp {
 
 		TextView input, output, console;
 
+		public string FixedInput {
+			set {
+				input.Text = value;
+			}
+		}
+		public string FixedOutput {
+			set {
+
+			}
+		}
+
 		//Note: Still need Run Step Over
 		bool running;
 
-        public Emulator() {
-			lc3 = new LC3();
-			assembly = new Assembler(lc3);
-			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
-			assembly.AssembleLines(
-				".ORIG x3000",
-				"GETC",
-				"OUT",
-				"LD R0, VALUE",
-				"JSR SUBROUTINE",
-				"JSR SUBROUTINE",
-				"JSR SUBROUTINE",
-				"JSR SUBROUTINE",
-				"HALT",
-				"VALUE .FILL #10",
-				"SUBROUTINE ADD R0, R0, R0",
-				"RET"
-				);
-
+        public Emulator(LC3 lc3, Assembler assembly) {
+			this.lc3 = lc3;
+			this.assembly = assembly;
 			Console.WriteLine("Program loaded");
 			Console.ReadLine();
 			Console.SetWindowSize(109, 57);
@@ -155,7 +150,7 @@ namespace LC_Sharp {
 					assembly.AssembleLines(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
 					instructions.ContentOffset = new Point(0, assembly.pc - instructions.Bounds.Height / 2);
 					UpdateInstructionsView();
-					console.Text = $"{console.Text.ToString().Replace("\r", "")}Debug code assembled successfully.";
+					console.Text = $"{console.Text.ToString().Replace("\r", "")}Debug code assembled successfully.\n";
 				}
 				catch(Exception e) { console.Text = (console.Text.ToString() + e.Message).Replace("\r", ""); }
 			});
@@ -273,24 +268,29 @@ namespace LC_Sharp {
 				runAllButton.Text = "Pause Run All";
 				status.Text = "Running All".PadSurround(16, '-');
 			}
-		}
-		public void StopRunAll() {
-			running = false;
-			Application.MainLoop.RemoveIdle(RunAll);
-			runAllButton.Text = "Run All";
-			ResetStatus();
-		}
-        public bool RunAll() {
-			Run();
-			if(lc3.Active) {
-				return true;  //We keep running as long as we are active
-			} else {
-				//Otherwise we are done running
-				StopRunAll();
-				return false;
+			void StopRunAll() {
+				running = false;
+				Application.MainLoop.RemoveIdle(RunAll);
+				runAllButton.Text = "Run All";
+				ResetStatus();
 			}
-			
-        }
+			bool RunAll() {
+				Run();
+				//Stop running if needed
+				if (!running) {
+					StopRunAll();
+					return false;
+				}
+
+				if (lc3.Active) {
+					return true;  //We keep running as long as we are active
+				} else {
+					//Otherwise we are done running
+					StopRunAll();
+					return false;
+				}
+			}
+		}
 		public void ClickRunStepOnce() {
 			if (running) {
 				StopRunStepOnce();
@@ -311,6 +311,12 @@ namespace LC_Sharp {
 			}
 			bool RunStepOnce() {
 				Run();
+				//Stop running if needed
+				if (!running) {
+					StopRunStepOnce();
+					return false;
+				}
+
 				//If we are running a TRAP instruction, we should wait for it to finish
 				if (lc3.status == LC3.Status.TRAP) {
 					ResetStatus();
@@ -344,6 +350,11 @@ namespace LC_Sharp {
 			}
 			bool RunStepOver() {
 				Run();
+				//Stop running if needed
+				if(!running) {
+					StopRunStepOver();
+					return false;
+				}
 				//If we are running a TRAP instruction, we should wait for it to finish
 				if (lc3.status == LC3.Status.TRAP) {
 					ResetStatus();
@@ -357,12 +368,20 @@ namespace LC_Sharp {
 			}
 		}
 		public void Run() {
-			lc3.Fetch();
-
-			if (lc3.control.ir == 0) {
-				lc3.status = LC3.Status.ERROR;
-				return;
+			if(lc3.memory.Read(lc3.control.pc) == 0) {
+				console.Text = $"{console.Text.ToString().Replace("\r", "")}Warning: NOP instruction at {lc3.control.pc.ToHexString()};\nDid you forget a RET or HALT?\n";
+			} else if(assembly.nonInstruction.Contains(lc3.control.pc)) {
+				console.Text = $"{console.Text.ToString().Replace("\r", "")}Warning: non-instruction data at {lc3.control.pc.ToHexString()};\nDid you forget a RET or HALT?\n";
+			} else {
+				goto Good;
 			}
+			lc3.Fetch();
+			UpdateHighlight();
+			running = false;
+			return;
+
+			Good:
+			lc3.Fetch();
 
 			lc3.Execute();
 
@@ -384,12 +403,11 @@ namespace LC_Sharp {
 			//See if KBSR is waiting for input
 			if (lc3.memory.Read(kbsr) == 1) {
 				//Check if we have input ready
-				//For some reason, the box text always contains two invisible newline characters
-				if (input.Text.Length > 2) {
+				if (input.Text.Length > 0) {
 					lc3.memory.Write(kbsr, unchecked((short)0xFFFF));           //Set KBSR ready
 					lc3.memory.Write(kbdr, input.Text[0]);  //Write in the first character from input window
 					//For some reason, the box text always contains two newline characters
-					input.Text = input.Text.ToString().Substring(1, Math.Max(0, input.Text.Length - 3));   //Consume the first character from input window
+					input.Text = input.Text.ToString().Substring(1);   //Consume the first character from input window
 					input.SetNeedsDisplay();
 				}
 			}
@@ -403,13 +421,13 @@ namespace LC_Sharp {
 			if (lc3.memory.Read(dsr) == 1) {
 				char c = (char)lc3.memory.Read(ddr);        //Read char from DDR
 				if(c != 0) {
-					output.Text = (output.Text.ToString().Substring(0, output.Text.Length - 2) + c);   //Send char to output window
+					output.Text = output.Text.ToString() + c;   //Send char to output window
 					output.SetNeedsDisplay();
 				}
 			}
 			lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 		}
-		public void Init() {
+		public void Start() {
             //Application.UseSystemConsole = true;
             Application.Init();
             var top = Application.Top;
