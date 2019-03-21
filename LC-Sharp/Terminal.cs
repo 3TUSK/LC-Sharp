@@ -5,7 +5,13 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace LC_Sharp {
-	class Terminal {
+	class Terminal
+	{
+		private const short KBSR = unchecked((short) 0xFE00);
+		private const short KBDR = unchecked((short) 0xFE02);
+		private const short DSR = unchecked((short) 0xFE04);
+		private const short DDR = unchecked((short) 0xFE06);
+
 		private LC3 lc3;
 		private Assembler assembly;
 
@@ -24,14 +30,11 @@ namespace LC_Sharp {
 				lc3.Fetch();
 				lc3.Execute();
 
-				short kbsr = unchecked((short)0xFE00);
-				short kbdr = unchecked((short)0xFE02);
-
 				//See if KBSR is waiting for input
-				if (lc3.memory.Read(kbsr) == 1) {
+				if (lc3.memory.Read(KBSR) == 1) {
 
 					Console.CursorVisible = true;
-					lc3.memory.Write(kbsr, unchecked((short)0xFFFF));           //Set KBSR ready
+					lc3.memory.Write(KBSR, unchecked((short)0xFFFF));           //Set KBSR ready
 					char c;
 
 					if(fixedInput != null) {
@@ -58,16 +61,13 @@ namespace LC_Sharp {
 						}
 					}
 					
-					lc3.memory.Write(kbdr, (short)c);  //Write in the first character from input window
+					lc3.memory.Write(KBDR, (short)c);  //Write in the first character from input window
 					Console.CursorVisible = false;
 				}
 
-				short dsr = unchecked((short)0xFE04);
-				short ddr = unchecked((short)0xFE06);
-
 				//DSR is waiting for output
-				if (lc3.memory.Read(dsr) == 1) {
-					char c = (char)lc3.memory.Read(ddr);        //Read char from DDR
+				if (lc3.memory.Read(DSR) == 1) {
+					char c = (char)lc3.memory.Read(DDR);        //Read char from DDR
 					if (c != 0) {
 						//Write to console
 						if(c == '\n') {
@@ -92,7 +92,7 @@ namespace LC_Sharp {
 						}
 					}
 				}
-				lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
+				lc3.memory.Write(DSR, unchecked((short)0xFFFF));              //Set DSR ready
 
 			}
 			Console.WriteLine("Press Enter to exit");
