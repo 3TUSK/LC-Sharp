@@ -95,7 +95,10 @@ namespace LC_Sharp {
 				lc3.memory.Write(DSR, unchecked((short)0xFFFF));              //Set DSR ready
 
 			}
-			Console.WriteLine("Press Enter to exit");
+			if(fixedInput.Length > 0) {
+				Console.WriteLine($"Program halted with extra input remaining: {fixedInput}");
+			}
+			Console.WriteLine("Program halted. Press Enter to exit");
 			Console.ReadLine();
 		}
 	}
