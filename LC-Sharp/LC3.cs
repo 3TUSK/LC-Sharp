@@ -1188,7 +1188,15 @@ namespace LC_Sharp {
 			return $"[{line}, {column}] {message} in {GetCurrentLine()}";
 		}
 		public string GetCurrentLine() {
-			return source.Substring(source.LastIndexOf('\n', index - 1), source.Length - index);
+			int start = source.LastIndexOf('\n', index - 1);
+			int end = source.IndexOf('\n', index);
+			if(start == -1) {
+				return source;
+			} else if(end == -1) {
+				return source.Substring(start);
+			} else {
+				return source.Substring(start, end - start);
+			}
 		}
 		public TokenType Read(out string token) {
 			Read:
