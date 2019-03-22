@@ -168,6 +168,7 @@ namespace LC_Sharp {
 					memory.ldMAR();
 					memory.memEnR();
 					memory.gateMDR();
+					processing.drmux = Processing.DRMUX.ir11_9;
 					processing.ldReg();
 					break;
 				case 0b0111:
@@ -799,7 +800,7 @@ namespace LC_Sharp {
 					return (short)(offset & mask);
 				}
 			} else {
-				foreach (var l in labels.Keys)
+				//foreach (var l in labels.Keys)
 					//Console.WriteLine(l);
 				//Otherwise, we don't accept this label
 				Error($"Unknown label '{label}'");
