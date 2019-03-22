@@ -551,9 +551,7 @@ namespace LC_Sharp {
 					case TokenType.Comment:
 						goto Read;
 					case TokenType.Symbol:
-						if(!short.TryParse(token, out length)) {
-							Error("Invalid short value");
-						}
+						length = Fill(token);
 						break;
 					default:
 						Error("Expected short value");
@@ -593,7 +591,7 @@ namespace LC_Sharp {
 						Error($"Invalid character literal {code}");
 					}
 				} else {
-					Error($"Invalid .FILL value {code}");
+					Error($"Invalid short value {code}");
 				}
 				return 0;
 			}
@@ -1221,6 +1219,10 @@ namespace LC_Sharp {
 					ProcessChar();
 					token = ReadQuoted();
 					return TokenType.String;
+				case '\'':
+					token = "";
+					//TO DO: Fix Char Literals
+					return TokenType.Symbol;
 				case ',':
 					ProcessChar();
 					token = ",";
