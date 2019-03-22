@@ -28,6 +28,7 @@ namespace LC_Sharp {
 						{
 							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to CLI mode...");
 							CommandLineMain(new CommandLineOptions()); // TODO (3TUSK): Provide fallback parameters
+							return 0;
 						}
 					}
 				);
