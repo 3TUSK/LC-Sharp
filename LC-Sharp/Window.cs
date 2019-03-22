@@ -55,7 +55,7 @@ namespace LC_Sharp {
         public Emulator(LC3 lc3, Assembler assembly) {
 			this.lc3 = lc3;
 			this.assembly = assembly;
-			Console.WriteLine("Program loaded");
+			Console.WriteLine("Program loaded. Press Enter to continue.");
 			Console.ReadLine();
 			Console.SetWindowSize(109, 57);
             window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
@@ -119,6 +119,7 @@ namespace LC_Sharp {
 					}
 					lc3.control.setPC(pc);
 					console.Text = $"{console.Text.ToString().Replace("\r", "")}PC set to {pc.ToHexString()}";
+					lc3.status = LC3.Status.ACTIVE;
 					UpdateRegisterView();
 					UpdateHighlight();
 				} catch (Exception e) {
@@ -247,7 +248,10 @@ namespace LC_Sharp {
 			string text = "";
 			foreach(var label in assembly.labels.Keys) {
 				short location = assembly.labels[label];
-				text += $"{location.ToHexString()} {label} {lc3.memory.Read(location).ToRegisterString()}\n";
+
+
+				if(((short) (location - lc3.control.pc)).WithinRange(11))
+					text += $"{location.ToHexString()} {label} {lc3.memory.Read(location).ToRegisterString()}\n";
 			}
 			labels.Text = text;
 		}

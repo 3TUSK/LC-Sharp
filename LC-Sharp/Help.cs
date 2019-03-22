@@ -3,8 +3,22 @@
     //When the MSB is one, the other bits represent the value to add to -2^n
     //If the unsigned value is greater than the max signed value (the MSB must be one), that means we subtract the max unsigned value to get the signed value 
     public static class Help {
+
+		//Verifies that an offset fits within a given size
+		public static bool WithinRange(this short offset, int size) {
+			ushort mask = (ushort)(0xFFFF >> (16 - size));    //All ones
+			short min = (short)-(1 << (size - 1));           //Highest negative number, same as the MSB
+															 //short max = (short)(0xEFFF >> (16 - size));
+			short max = (short)(-min - 1);                //Highest positive number, All ones except MSB
+			if (offset < min || offset > max) {
+				return false;
+			} else {
+				//Truncate the result to the given size
+				return true;
+			}
+		}
 		//n: the original size of the number to be extended
-        public static short signExtend(this short s, int n = 16) {
+		public static short signExtend(this short s, int n = 16) {
             short msbMask = (short) (0b1 << (n - 1));
             short negativeMask = (short) (0xFFFF << n);
             if((s & msbMask) != 0) {
