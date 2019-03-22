@@ -1,15 +1,10 @@
-﻿using NStack;
-using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Terminal.Gui;
 using Attribute = Terminal.Gui.Attribute;
 
 namespace LC_Sharp {
-    class Emulator {
+	class Emulator {
         LC3 lc3;
 		Assembler assembly;
 		Window window;
@@ -219,7 +214,7 @@ namespace LC_Sharp {
 			Label[] labels = new Label[40];
 			for(int i = 0; i < 40; i++) {
 				int index = start + i;
-				labels[i] = new Label(0, index, $" {index.ToHexShort()} {assembly.Dissemble((short)index, lc3.memory.Read((short)index))}");
+				labels[i] = new Label(0, index, $"{(assembly.breakpoints.Contains((short)index) ? "*" : " ")}{index.ToHexShort()} {assembly.Dissemble((short)index, lc3.memory.Read((short)index))}");
 			}
 			//Update the highlight
 			//Use ushort because negative short values break the index
@@ -374,17 +369,12 @@ namespace LC_Sharp {
 		public void Run() {
 			if(lc3.memory.Read(lc3.control.pc) == 0) {
 				console.Text = $"{console.Text.ToString().Replace("\r", "")}Warning: NOP instruction at {lc3.control.pc.ToHexString()};\nDid you forget a RET or HALT?\n";
+				goto Error;
 			} else if(assembly.nonInstruction.Contains(lc3.control.pc)) {
 				console.Text = $"{console.Text.ToString().Replace("\r", "")}Warning: non-instruction data at {lc3.control.pc.ToHexString()};\nDid you forget a RET or HALT?\n";
-			} else {
-				goto Good;
+				goto Error;
 			}
-			lc3.Fetch();
-			UpdateHighlight();
-			running = false;
-			return;
 
-			Good:
 			lc3.Fetch();
 
 			lc3.Execute();
@@ -399,6 +389,20 @@ namespace LC_Sharp {
 				UpdateRegisterView();
 			}
 			UpdateIOView();
+
+			if (assembly.breakpoints.Contains(lc3.control.pc)) {
+				console.Text = $"{console.Text.ToString().Replace("\r", "")}Reached breakpoint at {lc3.control.pc.ToHexString()};\nProgram execution paused.";
+				running = false;
+				return;
+			}
+
+			return;
+			Error:
+
+			lc3.Fetch();
+			UpdateHighlight();
+			running = false;
+			return;
 		}
 		public void UpdateIOView() {
 			short kbsr = unchecked((short)0xFE00);

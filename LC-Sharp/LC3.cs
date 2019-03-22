@@ -293,6 +293,7 @@ namespace LC_Sharp {
 		public Dictionary<short, string> labelsReverse { get; private set; } //reverse lookup labels
 		public Dictionary<string, short> trapLookup { get; private set; }
 		public Dictionary<short, string> comments { get; private set; }
+		public HashSet<short> breakpoints;
 		public HashSet<short> nonInstruction { get; private set; }
 		/*
 		public static Instruction Br(string name, short code) => new Instruction(name, (short) (0 | code), new[] { Operands.nzp, Operands.LabelOffset9 });
@@ -336,6 +337,7 @@ namespace LC_Sharp {
 			trapLookup = new Dictionary<string, short>();
 			comments = new Dictionary<short, string>();
 			secondPass = new List<InstructionPass>();
+			breakpoints = new HashSet<short>();
 			nonInstruction = new HashSet<short>();
 			InitDirectives();
 		}
@@ -561,7 +563,9 @@ namespace LC_Sharp {
 					pc++;
 				}
 			};
-			directives[".BREAK"] = (context, directive) => { };
+			directives[".BREAK"] = (context, directive) => {
+				breakpoints.Add(context.pc);
+			};
 			
 			short Fill(string code) {
 				if (code.StartsWith("b")) {
