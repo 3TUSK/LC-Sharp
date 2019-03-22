@@ -52,6 +52,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="trap.asm" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\gui.cs\Terminal.Gui\Terminal.Gui.csproj">
       <Project>{EC36A077-7A1F-4D90-8004-8117BEB3CCB6}</Project>
       <Name>Terminal.Gui</Name>

@@ -2,7 +2,6 @@
 using System;
 using System.IO;
 
-
 namespace LC_Sharp {
     class Program {
         //Note to self: do not use left shift to remove left bits since operands get converted to ints first
@@ -19,7 +18,7 @@ namespace LC_Sharp {
 							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
 							var lc3 = new LC3();
 							var assembly = new Assembler(lc3);
-							assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+							assembly.AssembleLines(File.ReadAllLines("trap.asm"));
 							assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
 							new Emulator(lc3, assembly).Start();
 							return 0;
@@ -70,7 +69,7 @@ namespace LC_Sharp {
 			}
 			LC3 lc3 = new LC3();
 			Assembler assembly = new Assembler(lc3);
-			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
 			assembly.AssembleLines(File.ReadAllLines(options.program));
 			new Emulator(lc3, assembly).Start();
 			return 0;
@@ -80,7 +79,7 @@ namespace LC_Sharp {
 		{
 			var lc3 = new LC3();
 			var assembly = new Assembler(lc3);
-			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
 			assembly.AssembleToPC(File.ReadAllLines(options.program));
 			string input = options.input != null ? File.ReadAllText(options.input) : null;
 			string output = options.output != null ? File.ReadAllText(options.output) : null;
