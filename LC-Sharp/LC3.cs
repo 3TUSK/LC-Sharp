@@ -795,7 +795,11 @@ namespace LC_Sharp {
 		public void ClearLabels() {
 			if (scopeName != null) {
 				foreach(var label in new List<string>(labels.Keys.AsEnumerable())) {
-					string renamed = $"{label}_{scopeName}";
+					//Do not rename already-scoped labels
+					if (label.Contains(" "))
+						continue;
+
+					string renamed = $"{label} ({scopeName})";
 					short location = labels[label];
 					labels[renamed] = location;
 					labels.Remove(label);
