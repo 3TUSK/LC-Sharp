@@ -67,7 +67,7 @@ Return		LD		R1, SaveR1	; Restore registers
 			RET					; Return from trap (JMP R7, actually)
 DSR			.FILL	xFE04		; Address of display status register
 DDR			.FILL	xFE06		; Address of display data register
-SaveR1		.BLKW	1
+SaveR1		.BLKW	#1
 			;.END
 
 ;------------------------------------------------------------------
@@ -290,9 +290,9 @@ PUTSP_SAV_R7 .FILL        #0
 ; Some constants
 
 ASCIINewLine .FILL x000A
-SaveRO		.BLKW 1
-SaveR1		.BLKW 1
-SaveR7		.BLKW 1
+SaveRO		.BLKW #1
+SaveR1		.BLKW #1
+SaveR7		.BLKW #1
 Message 	.STRINGZ "Halting the machine."
 MCR 		.FILL xFFFE ; Address of MCR
 MASK 		.FILL X7FFF ; Mask to clear the top bit

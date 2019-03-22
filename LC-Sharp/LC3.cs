@@ -1227,10 +1227,10 @@ namespace LC_Sharp {
 					ProcessChar();
 					token = ReadQuoted();
 					return TokenType.String;
-				case '\'':
-					token = "";
-					//TO DO: Fix Char Literals
-					return TokenType.Symbol;
+//				case '\'':
+//					token = "";
+//					//TO DO: Fix Char Literals
+//					return TokenType.Symbol;
 				case ',':
 					ProcessChar();
 					token = ",";
