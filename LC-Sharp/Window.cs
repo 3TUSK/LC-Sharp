@@ -391,7 +391,7 @@ namespace LC_Sharp {
 			UpdateIOView();
 
 			if (assembly.breakpoints.Contains(lc3.control.pc)) {
-				console.Text = $"{console.Text.ToString().Replace("\r", "")}Reached breakpoint at {lc3.control.pc.ToHexString()};\nProgram execution paused.";
+				console.Text = $"{console.Text.ToString().Replace("\r", "")}Reached breakpoint at {lc3.control.pc.ToHexString()};\nProgram execution paused.\n";
 				running = false;
 				return;
 			}

@@ -363,6 +363,7 @@ namespace LC_Sharp {
 		public void InitPass() {
 			passing = true;
 			secondPass.Clear();
+			scopeName = null;
 		}
 		public void FirstPass() {
 			Read:
@@ -792,10 +793,9 @@ namespace LC_Sharp {
 		*/
 
 		public void ClearLabels() {
-			/*
 			if (scopeName != null) {
-				foreach(var label in labels.Keys.) {
-					string renamed = $"{scopeName}_{label}";
+				foreach(var label in new List<string>(labels.Keys.AsEnumerable())) {
+					string renamed = $"{label}_{scopeName}";
 					short location = labels[label];
 					labels[renamed] = location;
 					labels.Remove(label);
@@ -803,8 +803,7 @@ namespace LC_Sharp {
 					labelsReverse[location] = renamed;
 				}
 			}
-			*/
-			labels.Clear();
+			//labels.Clear();
 			//We allow limited label reuse and identification by preserving the location-to-label map
 			//labelsReverse.Clear();
 		}
