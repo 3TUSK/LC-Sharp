@@ -14,13 +14,21 @@ namespace LC_Sharp {
 					(CommandLineOptions options) => CommandLineMain(options),
 					err => // Fall back to GUI directly if not parsed.
 					{
-						// TODO (3TUSK): Warn users about not using `lc3 gui`?
-						var lc3 = new LC3();
-						var assembly = new Assembler(lc3);
-						assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
-						assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
-						new Emulator(lc3, assembly).Start();
-						return 0;
+						if (Environment.UserInteractive)
+						{
+							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
+							var lc3 = new LC3();
+							var assembly = new Assembler(lc3);
+							assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
+							assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
+							new Emulator(lc3, assembly).Start();
+							return 0;
+						}
+						else
+						{
+							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to CLI mode...");
+							CommandLineMain(new CommandLineOptions()); // TODO (3TUSK): Provide fallback parameters
+						}
 					}
 				);
 		}
@@ -53,6 +61,12 @@ namespace LC_Sharp {
 		
 		private static int GraphicUserInterfaceMain(GraphicUserInterfaceOptions options)
 		{
+			if (!Environment.UserInteractive)
+			{
+				Console.Error.WriteLine("It looks like you are attempting running LC-Sharp GUI mode in a headless environment.");
+				Console.Error.WriteLine("Naturally, it does not make much senses. LC-Sharp will quit now to prevent further errors.");
+				return -1;
+			}
 			LC3 lc3 = new LC3();
 			Assembler assembly = new Assembler(lc3);
 			assembly.AssembleLines(File.ReadAllLines("../../trap.asm"));
