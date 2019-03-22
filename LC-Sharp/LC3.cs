@@ -337,6 +337,7 @@ namespace LC_Sharp {
 			comments = new Dictionary<short, string>();
 			secondPass = new List<InstructionPass>();
 			nonInstruction = new HashSet<short>();
+			InitDirectives();
 		}
 		//Assemble the given lines as new source to an existing program
 		public void AssembleToPC(params string[] lines) {
@@ -532,155 +533,36 @@ namespace LC_Sharp {
 				return ops.Code((short)((instruction & 0xF000) >> 12)).Dissemble(this, instruction);
 			}
 		}
-		public void Directive(string directive) {
-			switch (directive) {
-				case ".BLKW": {
-						short length = 0;
-						Read:
-						switch(reader.Read(out string token)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.Symbol:
-								if(!short.TryParse(token, out length)) {
-									Error("Invalid short value");
-								}
-								break;
-							default:
-								Error("Expected short value");
-								return;
-						}
-						for (int i = 0; i < length; i++) {
-							nonInstruction.Add((short) (pc - 1));
-							pc++;
+
+		public delegate void DirectiveProcessor(Assembler context, string directive);
+
+		private Dictionary<string, DirectiveProcessor> directives = new Dictionary<string, DirectiveProcessor>();
+
+		void InitDirectives()
+		{
+			directives[".BLKW"] = (context, directive) =>
+			{
+				short length = 0;
+				Read:
+				switch(reader.Read(out string token)) {
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.Symbol:
+						if(!short.TryParse(token, out length)) {
+							Error("Invalid short value");
 						}
 						break;
-					}
-				case ".BREAK":
-					break;
-				case ".FILL": {
-						short value = 0;
-						Read:
-						switch (reader.Read(out string token)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.Symbol:
-								value = Fill(token);
-								break;
-							default:
-								Error("Expected short value");
-								return;
-						}
-						short location = (short)(pc - 1);
-						Print($"Line {reader.line}: Passed Directive {directive} \"{token}\" / {value} with {(labelsReverse.TryGetValue(location, out string l) ? $"Label {l}" : "")} at {location.ToHexString()}");
-						nonInstruction.Add(location);
-						lc3.memory.Write(location, value);
-						pc++;
-
-						break;
-					}
-				case ".END": {
-						passing = false;
-						SecondPass();
-						ClearLabels();
-						Print($"Line {reader.line}: End of file");
-						break;
-					}
-				case ".ORIG": {
-						Read:
-						switch (reader.Read(out string orig)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.Symbol:
-								break;
-							default:
-								Error("Expected short value");
-								return;
-						}
-
-						if (!orig.StartsWith("X", true, null)) {
-							Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
-						}
-						Print($"Line {reader.line}: ORIG {orig}");
-
-						orig = orig.Substring(1);
-						pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
-						pc++;
-						break;
-					}
-				case ".SCOPE": {
-						//Declares a new scope and indicates that we should second-pass and clear out labels now
-						SecondPass();
-						ClearLabels();
-						Print($"Line {reader.line}: Clear current scope");
-
-						Read:
-						switch (reader.Read(out scopeName)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.Symbol:
-								break;
-							default:
-								Error("Expected scope name");
-								return;
-						}
-
-						break;
-					}
-				case ".STRINGZ": {
-						Read:
-						switch (reader.Read(out string s)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.String:
-								break;
-							default:
-								Error("Expected string value");
-								return;
-						}
-						//Handle escape chars
-						s = s.Replace("\\n", "\n");
-						for (int i = 0; i < s.Length; i++) {
-							nonInstruction.Add((short)(pc - 1));
-							lc3.memory.Write((short)(pc - 1), (short)s[i]);
-							pc++;
-						}
-						nonInstruction.Add((short)(pc - 1));
-						lc3.memory.Write((short)(pc - 1), 0);
-						pc++;
-						break;
-					}
-				case ".TRAP": {
-						Read:
-						switch (reader.Read(out string name)) {
-							case TokenType.Comment:
-								goto Read;
-							case TokenType.Symbol:
-								break;
-							default:
-								Error("Expected symbol value");
-								return;
-						}
-
-						short start = (short)(pc - 1);
-						trapLookup[name] = start;
-						//Write the current location to the TRAP vector table
-						lc3.memory.Write(trapVectorIndex, start);
-
-						//The operand is the name of the TRAP Subroutine
-						Print($"Line {reader.line}: TRAP {name}");
-						ops.Add(new Trap(name, trapVectorIndex));
-
-						//Increment the TRAP vector index
-						trapVectorIndex++;
-
-						//We also declare a new scope with this name
-						scopeName = name;
-						SecondPass();
-						ClearLabels();
-
-						break;
-					}
-			}
+					default:
+						Error("Expected short value");
+						return;
+				}
+				for (int i = 0; i < length; i++) {
+					nonInstruction.Add((short) (pc - 1));
+					pc++;
+				}
+			};
+			directives[".BREAK"] = (context, directive) => { };
+			
 			short Fill(string code) {
 				if (code.StartsWith("b")) {
 					short result = 0;
@@ -709,6 +591,147 @@ namespace LC_Sharp {
 					Error($"Invalid .FILL value {code}");
 				}
 				return 0;
+			}
+			
+			directives[".FILL"] = (context, directive) =>
+			{
+				short value = 0;
+				Read:
+				switch (reader.Read(out string token)) {
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.Symbol:
+						value = Fill(token);
+						break;
+					default:
+						Error("Expected short value");
+						return;
+				}
+				short location = (short)(pc - 1);
+				Print($"Line {reader.line}: Passed Directive {directive} \"{token}\" / {value} with {(labelsReverse.TryGetValue(location, out string l) ? $"Label {l}" : "")} at {location.ToHexString()}");
+				nonInstruction.Add(location);
+				lc3.memory.Write(location, value);
+				pc++;
+			};
+			directives[".END"] = (context, directive) =>
+			{
+				passing = false;
+				SecondPass();
+				ClearLabels();
+				Print($"Line {reader.line}: End of file");
+			};
+			directives[".ORIG"] = (context, directive) =>
+			{
+				Read:
+				switch (reader.Read(out string orig))
+				{
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.Symbol:
+						break;
+					default:
+						Error("Expected short value");
+						return;
+				}
+
+				if (!orig.StartsWith("X", true, null))
+				{
+					Error($"Invalid .ORIG location {orig} must be a hexadecimal number");
+				}
+
+				Print($"Line {reader.line}: ORIG {orig}");
+
+				orig = orig.Substring(1);
+				pc = short.Parse(orig, System.Globalization.NumberStyles.HexNumber);
+				pc++;
+			};
+			directives[".SCOPE"] = (context, directive) =>
+			{
+				//Declares a new scope and indicates that we should second-pass and clear out labels now
+				SecondPass();
+				ClearLabels();
+				Print($"Line {reader.line}: Clear current scope");
+
+				Read:
+				switch (reader.Read(out scopeName)) {
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.Symbol:
+						break;
+					default:
+						Error("Expected scope name");
+						return;
+				}
+			};
+			directives[".STRINGZ"] = (context, directive) =>
+			{
+				Read:
+				switch (reader.Read(out string s))
+				{
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.String:
+						break;
+					default:
+						Error("Expected string value");
+						return;
+				}
+
+				//Handle escape chars
+				s = s.Replace("\\n", "\n");
+				for (int i = 0; i < s.Length; i++)
+				{
+					nonInstruction.Add((short) (pc - 1));
+					lc3.memory.Write((short) (pc - 1), (short) s[i]);
+					pc++;
+				}
+
+				nonInstruction.Add((short) (pc - 1));
+				lc3.memory.Write((short) (pc - 1), 0);
+				pc++;
+			};
+			directives[".TRAP"] = (context, directive) =>
+			{
+				Read:
+				switch (reader.Read(out string name))
+				{
+					case TokenType.Comment:
+						goto Read;
+					case TokenType.Symbol:
+						break;
+					default:
+						Error("Expected symbol value");
+						return;
+				}
+
+				short start = (short) (pc - 1);
+				trapLookup[name] = start;
+				//Write the current location to the TRAP vector table
+				lc3.memory.Write(trapVectorIndex, start);
+
+				//The operand is the name of the TRAP Subroutine
+				Print($"Line {reader.line}: TRAP {name}");
+				ops.Add(new Trap(name, trapVectorIndex));
+
+				//Increment the TRAP vector index
+				trapVectorIndex++;
+
+				//We also declare a new scope with this name
+				scopeName = name;
+				SecondPass();
+				ClearLabels();
+			};
+		}
+		
+		public void Directive(string directive) 
+		{
+			if (directives.ContainsKey(directive))
+			{
+				directives[directive](this, directive);
+			}
+			else
+			{
+				// TODO (3TUSK): Log error or warn
 			}
 		}
 		/*
