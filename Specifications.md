@@ -12,6 +12,7 @@
   - `ldPC()`: Sets the `pc` from `pcmuxout` in the parent's `processing`
   - `gatePC()`: Sets the parent's `bus` to the PC
   - `ldIR()`: Sets the `ir` from the parent's `bus`
+- `Processing`: Contains the ALU, address adder, Muxes, registers, and condition codes
 - `Memory`: Contains the data of the LC-3's main memory
   - `mar`: A `ushort` for the MAR.
   - `mdr`: A `ushort` for the MDR.
@@ -37,11 +38,12 @@
   - `SecondPass()`: Handles all instructions stored for second pass, loading the instruction's `pc` and line `index` context info and then assembling it.
   - `Directive(string directive)`: Handles a named directive.
   - `.BLKW`: Skips the `pc` assembly context over a segment of memory locations.
+  - `.BREAK`: Records a breakpoint; the GUI will pause execution when the PC reaches this value
+  - `.END`: Ends the first pass for the current file, calling the second pass on instructions handled so far and clearing labels.
   - `.FILL`: Sets the data at the current memory location to the given value.
-  - `.END`: Ends the current scope by calling the second pass on instructions handled so far and clearing labels. Does not end the assembly process (the aforementioned scope functionality should be moved to a new directive called `.SCOPE`).
-  - `.TRAP`: Declares a new TRAP subroutine with the given name, adding the current memory location to the TRAP vector table and adding a new Trap object to the `ops` table.
+  - `.SCOPE`: Creates a new scope with the given name. Clears the previous scope by calling second pass on instructions handled so far and then appending its name to the labels passed so far.
   - `.STRINGZ`: Places the characters of the given string into a segment of memory locations the last of which will be set to `0`.
-- `NeoAssembler`: Yourui Xue's implementation of an LC-3 assembler.
+  - `.TRAP`: Declares a new TRAP subroutine with the given name, adding the current memory location to the TRAP vector table and adding a new Trap object to the `ops` table. Also creates a new scope with the given name.
 # Command-line arguments
 
 ## GUI Mode
@@ -49,10 +51,12 @@
 lcs gui {program_file} [input_file] [output_file] - launches LC-Sharp in GUI mode
 ```
 - Instructions
-  - A scrollable view of the LC-3's main memory. The current instruction about to be executed is highlighted.
-  - When an instruction is fetched, the view snaps to center on the instruction and highlights it. Exception: TRAP subroutines do not affect this view during execution.
+  - A scrollable view of the LC-3's main memory.
+  - The current instruction about to be executed is highlighted.
+  - When an instruction is fetched, the view snaps to center on the instruction and highlights it. Note that for abstraction purposes, TRAP subroutines do not affect this view during execution.
   - When scrolled, we dynamically regenerate the labels.
   - Updates on every instruction
+  - Locations containing breakpoints are prefixed with `*`
 - Registers
   - A state listing of the main registers, the condition codes, the PC, and the IR.
   - Updates on every instruction
@@ -74,8 +78,9 @@ lcs gui {program_file} [input_file] [output_file] - launches LC-Sharp in GUI mod
   - Run Step Once: Executes the current instruction. Waits for input if needed.
   - Run Step Over: Stores the current address of the PC (one index ahead) and executes instructions until that point is reached. Waits for input if needed.
 - Debug
-  - Set PC: A text view allowing the user to set the PC
-  - Write Instruction: A text view allowing the user to assemble an instruction directly into memory.
+  - Set Scroll: A text view allowing the user to set the current scroll position
+  - Set PC: A text view allowing the user to set the PC and reset the FSM's status if it was halted for any reason.
+  - Assemble Debug Code: A text view allowing the user to assemble instructions directly into memory.
 - Output
   - A read-only text view containing the program's output.
   - The DSR is checked during the main loop and any output is read from DDR and sent to this view.
@@ -89,35 +94,19 @@ lcs cli {program_file} [input_file] [output_file] - launches LC-Sharp in headles
 ```
 - In CLI mode, the emulator runs the entire program with no GUI.
 - Input
-  - If we have an output file, then we read all input from it.
-    - If the input file ends before the program is done taking input, then we throw an error.
+  - If we have an input file, then we read all input from it. If it ends before the program is done taking input, then we throw an error.
   - Otherwise, we get it through `ReadKey(true)`, which does not echo key presses (since the program should already do that).
 - Output
-  - If we have an output file, then we write all output to it.
-  - Otherwise, output is printed to console
+  - If we have an output file, then we make sure that the program's output matches the file contents.
+  - Output is printed to console
 
 # Macros
 - Custom TRAP Subroutines support - `.TRAP`
 
-# Compiling
-
-```
-$ git clone --recurse-submodules https://github.com/3TUSK/LC-Sharp 
-$ cd LC-Sharp
-$ dotnet publish --self-contained -r <TARGET_RUNTIME> -o ../LC-Sharp-Build LC-Sharp
-# Change ../LC-Sharp-Build to something else for a different output directory
-```
-
-where `<TARGET_RUNTIME>` specifies target platform, which may be the following, without limitation to:
-
- - `win10-x64` for Windows 10 (64-bit)
- - `osx.10.14-x64` for macOS 10.14 Mojave
- - `linux-x64` for most of Linux distro
- 
-A complete list of possible target platform may be found at https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
-
-Alternatively, you may also directly import the whole solution into your IDE, for example Visual Studio Community or JetBrains Rider,
-and run it there.
+# Compiling (TODO: We need a minimum compilation guide)
+- Install Visual Studio Community 2017
+- We require a modified GUI library available at [INeedAUniqueUsername/gui.cs](https://github.com/INeedAUniqueUsername/gui.cs)
+- Open `LC-Sharp.sln`
 
 # Unicode support
   - In LC-Sharp, the upper nibble (`[15:8]`) of Display Data Register (DDR, `xFE06`) is also reserved. That said, character written in the whole DDR will be displayed on the screen.
