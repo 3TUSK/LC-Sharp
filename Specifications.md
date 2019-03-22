@@ -103,10 +103,25 @@ lcs cli {program_file} [input_file] [output_file] - launches LC-Sharp in headles
 # Macros
 - Custom TRAP Subroutines support - `.TRAP`
 
-# Compiling (TODO: We need a minimum compilation guide)
-- Install Visual Studio Community 2017
-- We require a modified GUI library available at [INeedAUniqueUsername/gui.cs](https://github.com/INeedAUniqueUsername/gui.cs)
-- Open `LC-Sharp.sln`
+# Compiling
+
+```
+$ git clone --recurse-submodules https://github.com/3TUSK/LC-Sharp 
+$ cd LC-Sharp
+$ dotnet publish --self-contained -r <TARGET_RUNTIME> -o ../LC-Sharp-Build LC-Sharp
+# Change ../LC-Sharp-Build to something else for a different output directory
+```
+
+where `<TARGET_RUNTIME>` specifies target platform, which may be the following, without limitation to:
+
+ - `win10-x64` for Windows 10 (64-bit)
+ - `osx.10.14-x64` for macOS 10.14 Mojave
+ - `linux-x64` for most of Linux distro
+
+A complete list of possible target platform may be found at https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
+
+Alternatively, you may also directly import the whole solution into your IDE, for example Visual Studio Community or JetBrains Rider,
+and run it there.
 
 # Unicode support
   - In LC-Sharp, the upper nibble (`[15:8]`) of Display Data Register (DDR, `xFE06`) is also reserved. That said, character written in the whole DDR will be displayed on the screen.
