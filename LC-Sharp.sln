@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LC-Sharp", "LC-Sharp\LC-Sha
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Terminal.Gui", "gui.cs\Terminal.Gui\Terminal.Gui.csproj", "{EC36A077-7A1F-4D90-8004-8117BEB3CCB6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LC-Sharp-Test", "LC-Sharp-Test\LC-Sharp-Test.csproj", "{AF2BF154-478B-4548-9737-68AC83DAD9E7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{EC36A077-7A1F-4D90-8004-8117BEB3CCB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EC36A077-7A1F-4D90-8004-8117BEB3CCB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EC36A077-7A1F-4D90-8004-8117BEB3CCB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF2BF154-478B-4548-9737-68AC83DAD9E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF2BF154-478B-4548-9737-68AC83DAD9E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF2BF154-478B-4548-9737-68AC83DAD9E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF2BF154-478B-4548-9737-68AC83DAD9E7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
