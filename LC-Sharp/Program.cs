@@ -18,9 +18,10 @@ namespace LC_Sharp {
 							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
 							var lc3 = new LC3();
 							var assembly = new Assembler(lc3);
-							assembly.AssembleLines(File.ReadAllLines("trap.asm"));
-							//assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
-							new Emulator(lc3, assembly).Start();
+							assembly.AssembleLines(File.ReadAllText("trap.asm"));
+							var program = @"C:\Users\alexm\source\repos\cs061\assn_mu_solution.asm";
+							assembly.AssembleLines(File.ReadAllText(program));
+							new Emulator(lc3, assembly, program).Start();
 							return 0;
 						}
 						else

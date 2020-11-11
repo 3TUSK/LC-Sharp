@@ -1227,10 +1227,10 @@ namespace LC_Sharp {
 					ProcessChar();
 					token = ReadQuoted();
 					return TokenType.String;
-//				case '\'':
-//					token = "";
-//					//TO DO: Fix Char Literals
-//					return TokenType.Symbol;
+				case '\'':
+					ProcessChar();
+					token = ReadChar();
+					return TokenType.Symbol;
 				case ',':
 					ProcessChar();
 					token = ",";
@@ -1259,6 +1259,26 @@ namespace LC_Sharp {
 					goto Read;
 			}
 		}
+		string ReadChar() {
+			string result = "'";
+		Read:
+			if (index == source.Length) {
+				throw new Exception($"[{line}, {column}] Missing close apostrophe: {result}");
+			}
+			switch (source[index]) {
+				case '\r':
+				case '\n':
+					throw new Exception($"[{line}, {column}] Missing close apostrophe: {result}");
+				case '\'':
+					result += source[index];
+					ProcessChar();
+					return result;
+				default:
+					result += source[index];
+					ProcessChar();
+					goto Read;
+			}
+		}
 		string ReadSubstring() {
 			string result = "";
 			Read:
@@ -1271,6 +1291,9 @@ namespace LC_Sharp {
 				case '\r':
 				case '\n':
 				case ',':
+					return result;
+				case ':':
+					ProcessChar();
 					return result;
 				default:
 					result += source[index];
