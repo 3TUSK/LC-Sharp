@@ -75,14 +75,17 @@ namespace LC_Sharp {
 				void LoadProgram() {
 					try {
 						var programFile = fileField.Text.ToString();
+						var program = File.ReadAllText(programFile);
 						var lc3 = new LC3();
 						var assembly = new Assembler(lc3);
-						assembly.AssembleLines(File.ReadAllLines("trap.asm"));
-						assembly.AssembleLines(File.ReadAllLines(programFile));
+						assembly.AssembleLines(File.ReadAllText("trap.asm"));
+						assembly.AssembleLines(program);
 
 						output.Text = "";
 						input.Text = "";
 						console.Text = "";
+						assembleDebugField.Text = "";
+						//assembleDebugField.Text = program;
 
 						this.lc3 = lc3;
 						this.assembly = assembly;
@@ -112,7 +115,15 @@ namespace LC_Sharp {
 
 			{
 				var w = new Window(new Rect(0, 43, 64, 15), "Assemble");
-				assembleDebugField = new TextView(new Rect(0, 0, 62, 10));
+				assembleDebugField = new TextView(new Rect(0, 0, 62, 13));
+				/*
+				try {
+					var program = File.ReadAllText(programFile);
+					assembleDebugField.Text = program.Replace("\r", null);
+				} catch (Exception e) {
+					assembleDebugField.Text = "";
+				}
+				*/
 				assembleDebugField.Text = "";
 				w.Add(assembleDebugField);
 				window.Add(w);
@@ -199,7 +210,11 @@ namespace LC_Sharp {
 			assembleDebugButton.Clicked += AssembleDebug;
 			void AssembleDebug() {
 				try {
-					assembly.AssembleToPC(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
+
+
+					//assembly.AssembleToPC(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
+					//Create a new assembler so we can redefine labels
+					new Assembler(lc3).AssembleToPC(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
 					instructions.ContentOffset = new Point(0, lc3.control.pc - instructions.Bounds.Height / 2);
 					UpdateInstructionsView();
 					WriteConsole("Debug code assembled successfully.");
@@ -318,7 +333,7 @@ namespace LC_Sharp {
 			return new Attribute((int)f & 0xffff);
 		}
 		public void AddTimer(Func<bool> f) {
-			Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(100), (m) => {
+			Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(10), (m) => {
 				int i = 100;
 				bool result;
 				do {
