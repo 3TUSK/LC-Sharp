@@ -47,22 +47,22 @@ namespace LC_Sharp {
 		//Note: Still need Run Step Over
 		bool running;
 
-        public Emulator(LC3 lc3, Assembler assembly) {
+		public Emulator(LC3 lc3, Assembler assembly) {
 			this.lc3 = lc3;
 			this.assembly = assembly;
 			Console.WriteLine("Program loaded. Press Enter to continue.");
 			Console.ReadLine();
 			Console.SetWindowSize(109, 57);
-            window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
-            instructions = new ScrollView(new Rect(0, 0, 30, 40), new Rect(0, 0, 30, 0xFFFF));
-            instructions.ShowVerticalScrollIndicator = true;
-			instructions.Scrolled += _ => UpdateInstructionsView();
+			window = new Window(new Rect(0, 0, 96, 48), "LC-Sharp");
+			instructions = new ScrollView(new Rect(0, 0, 30, 40)) { ContentSize = new Size(30, 0xFFFF) };
+			instructions.ShowVerticalScrollIndicator = true;
+			instructions.MouseClick += _ => UpdateInstructionsView();
 			UpdateInstructionsView();
 			{
-                Window w = new Window(new Rect(0, 0, 32, 42), "Instructions");
-                w.Add(instructions);
-                window.Add(w);
-            }
+				Window w = new Window(new Rect(0, 0, 32, 42), "Instructions");
+				w.Add(instructions);
+				window.Add(w);
+			}
 
 			{
 				var w = new Window(new Rect(0, 42, 64, 12), "Debug");
@@ -74,82 +74,87 @@ namespace LC_Sharp {
 
 
 			registerLabels = new Label[8];
-            for(int i = 0; i < 8; i++) {
-                registerLabels[i] = new Label(1, i, $"R{i}");
-            }
+			for (int i = 0; i < 8; i++) {
+				registerLabels[i] = new Label(1, i, $"R{i}");
+			}
 
 			ccLabel = new Label(1, 9, "CC");
 
-            pcLabel = new Label(1, 11, "PC");
-            irLabel = new Label(1, 12, "IR");
-            {
-                Window w = new Window(new Rect(32, 0, 32, 16), "Registers");
-                w.Add(registerLabels);
+			pcLabel = new Label(1, 11, "PC");
+			irLabel = new Label(1, 12, "IR");
+			{
+				Window w = new Window(new Rect(32, 0, 32, 16), "Registers");
+				w.Add(registerLabels);
 				w.Add(ccLabel);
-                w.Add(pcLabel, irLabel);
-                window.Add(w);
-            }
-            Window labelsView = new Window(new Rect(32, 16, 32, 16), "Labels");
+				w.Add(pcLabel, irLabel);
+				window.Add(w);
+			}
+			Window labelsView = new Window(new Rect(32, 16, 32, 16), "Labels");
 			labels = new TextView(new Rect(0, 0, 30, 14)) { Text = "", ReadOnly = true };
 			labelsView.Add(labels);
-            window.Add(labelsView);
+			window.Add(labelsView);
 
 			status = new Label(new Rect(32, 32, 16, 4), "");
 			ResetStatus();
 			window.Add(status);
 
-            runAllButton = new Button(32, 33, "Run All", ClickRunAll);
-			runStepOnceButton = new Button(32, 34, "Run Step Once", ClickRunStepOnce);
-			runStepOverButton = new Button(32, 35, "Run Step Over", ClickRunStepOver);
+			runAllButton = new Button(32, 33, "Run All") { Clicked = ClickRunAll };
+			runStepOnceButton = new Button(32, 34, "Run Step Once") { Clicked = ClickRunStepOnce };
+			runStepOverButton = new Button(32, 35, "Run Step Over") {Clicked= ClickRunStepOver};
 
 			setPCfield = new TextField(54, 36, 9, "");
-			setPCbutton = new Button(32, 36, "Set PC", () => {
-				try {
-					string s = setPCfield.Text.ToString().Trim().ToLower();
-					short pc;
-					if (s.StartsWith("0x")) {
-						pc = short.Parse(s.Substring(2), System.Globalization.NumberStyles.HexNumber);
-					} else {
-						pc = short.Parse(s.Substring(1));
+			setPCbutton = new Button(32, 36, "Set PC") {
+				Clicked = () => {
+					try {
+						string s = setPCfield.Text.ToString().Trim().ToLower();
+						short pc;
+						if (s.StartsWith("0x")) {
+							pc = short.Parse(s.Substring(2), System.Globalization.NumberStyles.HexNumber);
+						} else {
+							pc = short.Parse(s.Substring(1));
+						}
+						lc3.control.setPC(pc);
+						console.Text = $"{console.Text.ToString().Replace("\r", "")}PC set to {pc.ToHexString()}";
+						lc3.status = LC3.Status.ACTIVE;
+						UpdateRegisterView();
+						UpdateHighlight();
+					} catch (Exception e) {
+						console.Text = (console.Text.ToString() + e.Message).Replace("\r", "");
 					}
-					lc3.control.setPC(pc);
-					console.Text = $"{console.Text.ToString().Replace("\r", "")}PC set to {pc.ToHexString()}";
-					lc3.status = LC3.Status.ACTIVE;
-					UpdateRegisterView();
-					UpdateHighlight();
-				} catch (Exception e) {
-					console.Text = (console.Text.ToString() + e.Message).Replace("\r", "");
-				}
 
-			});
+				}
+			};
 
 			setScrollField = new TextField(54, 37, 9, "");
-			setScrollButton = new Button(32, 37, "Set Scroll", () => {
-				try {
-					string s = setScrollField.Text.ToString().Trim().ToLower();
-					short pc;
-					if (s.StartsWith("0x")) {
-						pc = short.Parse(s.Substring(2), System.Globalization.NumberStyles.HexNumber);
-					} else {
-						pc = short.Parse(s.Substring(1));
+			setScrollButton = new Button(32, 37, "Set Scroll") {
+				Clicked = () => {
+					try {
+						string s = setScrollField.Text.ToString().Trim().ToLower();
+						short pc;
+						if (s.StartsWith("0x")) {
+							pc = short.Parse(s.Substring(2), System.Globalization.NumberStyles.HexNumber);
+						} else {
+							pc = short.Parse(s.Substring(1));
+						}
+
+						instructions.ContentOffset = new Point(0, pc - instructions.Bounds.Height / 2);
+						UpdateInstructionsView();
+					} catch (Exception e) {
+						console.Text = (console.Text.ToString() + e.Message).Replace("\r", "");
 					}
-
-					instructions.ContentOffset = new Point(0, pc - instructions.Bounds.Height / 2);
-					UpdateInstructionsView();
-				} catch (Exception e) {
-					console.Text = (console.Text.ToString() + e.Message).Replace("\r", "");
 				}
-			});
+			};
 
-			assembleDebugButton = new Button(32, 38, "Assemble Debug code", () => {
-				try {
-					assembly.AssembleLines(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
-					instructions.ContentOffset = new Point(0, assembly.pc - instructions.Bounds.Height / 2);
-					UpdateInstructionsView();
-					console.Text = $"{console.Text.ToString().Replace("\r", "")}Debug code assembled successfully.\n";
+			assembleDebugButton = new Button(32, 38, "Assemble Debug code") {
+				Clicked = () => {
+					try {
+						assembly.AssembleLines(assembleDebugField.Text.ToString().Replace("\r", "").Split('\n'));
+						instructions.ContentOffset = new Point(0, assembly.pc - instructions.Bounds.Height / 2);
+						UpdateInstructionsView();
+						console.Text = $"{console.Text.ToString().Replace("\r", "")}Debug code assembled successfully.\n";
+					} catch (Exception e) { console.Text = (console.Text.ToString() + e.Message).Replace("\r", ""); }
 				}
-				catch(Exception e) { console.Text = (console.Text.ToString() + e.Message).Replace("\r", ""); }
-			});
+			};
 			window.Add(runAllButton, runStepOnceButton, runStepOverButton, setPCbutton, setPCfield, setScrollButton, setScrollField, assembleDebugButton);
 
 
@@ -221,7 +226,7 @@ namespace LC_Sharp {
 			ushort pc = (ushort)lc3.control.pc;
 			var l = labels.ElementAtOrDefault(pc - start);
 			if (l != null) {
-				l.TextColor = MakeColor(ConsoleColor.White);
+				//l. = MakeColor(ConsoleColor.White);
 			}
 
 			instructions.Add(labels);
@@ -436,11 +441,10 @@ namespace LC_Sharp {
 			lc3.memory.Write(dsr, unchecked((short)0xFFFF));              //Set DSR ready
 		}
 		public void Start() {
-            //Application.UseSystemConsole = true;
+            //Application.UseSystemConsole;
             Application.Init();
             var top = Application.Top;
             top.Add(window);
-            Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(1000/60), _ => true); //Hack to keep the window updating without touching the keyboard or mouse
             Application.Run(window);
 		}
     }

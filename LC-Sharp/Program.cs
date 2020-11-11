@@ -19,7 +19,7 @@ namespace LC_Sharp {
 							var lc3 = new LC3();
 							var assembly = new Assembler(lc3);
 							assembly.AssembleLines(File.ReadAllLines("trap.asm"));
-							assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
+							//assembly.AssembleLines(File.ReadAllText("../../../cs61_assignments/assn-1-INeedAUniqueUsername/assn1.asm"));
 							new Emulator(lc3, assembly).Start();
 							return 0;
 						}
@@ -80,7 +80,9 @@ namespace LC_Sharp {
 			var lc3 = new LC3();
 			var assembly = new Assembler(lc3);
 			assembly.AssembleLines(File.ReadAllLines("trap.asm"));
-			assembly.AssembleToPC(File.ReadAllLines(options.program));
+			if (options.program != null) {
+				assembly.AssembleToPC(File.ReadAllLines(options.program));
+			}
 			string input = options.input != null ? File.ReadAllText(options.input) : null;
 			string output = options.output != null ? File.ReadAllText(options.output) : null;
 			Console.WriteLine("Assembly successful, launching LC3 Finite State Machine...");
