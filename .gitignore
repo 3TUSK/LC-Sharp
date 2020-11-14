@@ -260,3 +260,4 @@ paket-files/
 __pycache__/
 *.pyc
 /cs61_assignments
+/LC-Sharp/Properties/PublishProfiles
