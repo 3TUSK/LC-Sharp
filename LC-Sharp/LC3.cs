@@ -512,14 +512,14 @@ namespace LC_Sharp {
 			//This might be a FILLED value, but we can't tell
 			if(nonInstruction.Contains((short) (pc))) {
 				if (Lookup((short)(pc), out string label))
-					return $"{label} {lc3.memory.Read((short) (pc)).ToHexString()}";
+					return $"{label.PadRight(30)} {lc3.memory.Read((short) (pc)).ToHexString()}";
 				else
 					return $"[DATA] {lc3.memory.Read((short)(pc)).ToHexString()}";
 			}
 
 			//For TRAP Subroutines, we consider their entire code to be an opcode
 			if ((instruction & 0xF000) == 0xF000) {
-				var s = Convert.ToString(instruction, 2);
+				//var s = Convert.ToString(instruction, 2);
 				if (ops.TryCode(instruction, out Op result))
 					return result.Dissemble(this, instruction);
 				return instruction.ToRegisterString();
@@ -993,7 +993,7 @@ namespace LC_Sharp {
 						bitIndex -= 3;
 						break;
 					case Operands.Reg: {
-							if (args == null) {
+							if (arg == null) {
 								context.Error($"Missing register in {args}");
 							}
 							if (!context.Register(arg, out short reg)) {

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Reflection.PortableExecutable;
+using System.Threading;
 using Terminal.Gui;
 using Attribute = Terminal.Gui.Attribute;
 
@@ -61,60 +62,111 @@ namespace LC_Sharp {
 		public void InitWindow() {
 			//Console.WriteLine("Program loaded. Press Enter to continue.");
 			//Console.ReadLine();
-			Console.SetWindowSize(120, 60);
-			window = new Window(new Rect(0, 0, 120, 60), "LC-Sharp");
+			Console.SetWindowSize(150, 60);
+			window = new Window(new Rect(0, 0, 150, 60), "LC-Sharp");
 
             {
 				TextField fileField = new TextField(0, 0, 64, programFile);
 				window.Add(fileField);
 
 				Button loadButton = new Button(64, 0, "Load");
+				loadButton.Clicked += LoadProgram;
 				window.Add(loadButton);
 
-				loadButton.Clicked += LoadProgram;
-				void LoadProgram() {
-					try {
-						var programFile = fileField.Text.ToString();
-						var program = File.ReadAllText(programFile);
-						var lc3 = new LC3();
-						var assembly = new Assembler(lc3);
-						assembly.AssembleLines(File.ReadAllText("trap.asm"));
-						assembly.AssembleLines(program);
 
-						output.Text = "";
-						input.Text = "";
-						console.Text = "";
-						assembleDebugField.Text = "";
-						//assembleDebugField.Text = program;
+				bool loading = false;
+				var lastLoad = programFile != null ? File.GetLastWriteTimeUtc(programFile) : DateTime.Now;
 
-						this.lc3 = lc3;
-						this.assembly = assembly;
-						this.programFile = programFile;
-
-						UpdateRegisterView();
-						UpdateHighlight();
-						UpdateIOView();
-
-						UpdateInstructionsView();
-						ResetStatus();
-					} catch (Exception e) {
-						WriteConsole(e.Message);
+				bool autoReload = false;
+				CheckBox autoReloadBox = new CheckBox(74, 0, "Auto Reload", false);
+				autoReloadBox.Toggled += b => {
+					if(b) {
+						autoReload = false;
+					} else {
+						autoReload = true;
+						Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(1000), m => {
+							if (autoReload) {
+								if(fileField.Text.Any()) {
+                                    if (!loading) {
+										var time = File.GetLastWriteTimeUtc(fileField.Text.ToString());
+										if (time != lastLoad) {
+											lastLoad = time;
+											LoadProgram();
+										}
+									}
+									
+								}
+								
+								return true;
+							} else {
+								return false;
+							}
+						});
 					}
+				};
+				window.Add(autoReloadBox);
+
+				Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(0), m => {
+					LoadProgram();
+					return false;
+				});
+
+				void LoadProgram() {
+					loading = true;
+
+					window.Remove(loadButton);
+					var loadingLabel = new Label(64, 0, "Loading...");
+					window.Add(loadingLabel);
+
+					new Thread(() => {
+						try {
+							var programFile = fileField.Text.ToString();
+							var program = File.ReadAllText(programFile);
+							var lc3 = new LC3();
+							var assembly = new Assembler(lc3);
+							assembly.AssembleLines(File.ReadAllText("trap.asm"));
+							assembly.AssembleLines(program);
+
+							output.Text = "";
+							input.Text = "";
+							console.Text = "";
+							assembleDebugField.Text = "";
+							//assembleDebugField.Text = program;
+
+							this.lc3 = lc3;
+							this.assembly = assembly;
+							this.programFile = programFile;
+
+							UpdateRegisterView();
+							UpdateHighlight();
+							UpdateIOView();
+
+							UpdateInstructionsView();
+							ResetStatus();
+						} catch (Exception e) {
+							WriteConsole(e.Message);
+						} finally {
+							window.Remove(loadingLabel);
+							window.Add(loadButton);
+							loading = false;
+						}
+					}).Start();
 				}
 			}
-
-			instructions = new ScrollView(new Rect(0, 1, 30, 40)) { ContentSize = new Size(30, 0xFFFF) };
+			int x = 0;
+			int width = 56;
+			instructions = new ScrollView(new Rect(0, 0, width-2, 40)) { ContentSize = new Size(30, 0xFFFF) };
 			instructions.ShowVerticalScrollIndicator = true;
 			instructions.MouseClick += _ => UpdateInstructionsView();
 			UpdateInstructionsView();
 			{
-				Window w = new Window(new Rect(0, 1, 32, 42), "Instructions");
+				Window w = new Window(new Rect(x, 1, width, 42), "Instructions");
 				w.Add(instructions);
 				window.Add(w);
 			}
 
 			{
-				var w = new Window(new Rect(0, 43, 64, 15), "Assemble");
+				var w = new Window(new Rect(x, 43, width + 32, 15), "Assemble");
 				assembleDebugField = new TextView(new Rect(0, 0, 62, 13));
 				/*
 				try {
@@ -132,38 +184,43 @@ namespace LC_Sharp {
 
 			registerLabels = new Label[8];
 			for (int i = 0; i < 8; i++) {
-				registerLabels[i] = new Label(1, i, $"R{i}");
+				//We need to make the label 30-wide on init because it won't expand
+				Label l = new Label(1, i, $"R{i}".PadRight(30));
+				registerLabels[i] = l;
 			}
 
-			ccLabel = new Label(1, 9, "CC");
+			ccLabel = new Label(1, 9, "CC".PadRight(30));
 
-			pcLabel = new Label(1, 11, "PC");
-			irLabel = new Label(1, 12, "IR");
+			pcLabel = new Label(1, 11, "PC".PadRight(30));
+			irLabel = new Label(1, 12, "IR".PadRight(30));
+
+			x += width;
+			width = 32;
 			{
-				Window w = new Window(new Rect(32, 1, 32, 16), "Registers");
+				Window w = new Window(new Rect(x, 1, width, 16), "Registers");
 				w.Add(registerLabels);
 				w.Add(ccLabel);
 				w.Add(pcLabel, irLabel);
 				window.Add(w);
 			}
-			Window labelsView = new Window(new Rect(32, 17, 32, 16), "Labels");
-			labels = new TextView(new Rect(0, 0, 30, 14)) { Text = "", ReadOnly = true };
+			Window labelsView = new Window(new Rect(x, 17, width, 16), "Labels");
+			labels = new TextView(new Rect(0, 0, width-2, 14)) { Text = "", ReadOnly = true };
 			labelsView.Add(labels);
 			window.Add(labelsView);
 
-			status = new Label(new Rect(32, 33, 16, 4), "");
+			status = new Label(new Rect(x, 33, 16, 4), "Status");
 			ResetStatus();
 			window.Add(status);
 
-			runAllButton = new Button(32, 34, "Run All");
+			runAllButton = new Button(x, 34, "Run All");
 			runAllButton.Clicked += ClickRunAll;
-			runStepOnceButton = new Button(32, 35, "Run Step Once");
+			runStepOnceButton = new Button(x, 35, "Run Step Once");
 			runStepOnceButton.Clicked += ClickRunStepOnce;
-			runStepOverButton = new Button(32, 36, "Run Step Over");
+			runStepOverButton = new Button(x, 36, "Run Step Over");
 			runStepOverButton.Clicked += ClickRunStepOver;
 
-			setPCfield = new TextField(54, 37, 9, "");
-			setPCbutton = new Button(32, 37, "Set PC");
+			setPCfield = new TextField(x + 22, 37, 9, "");
+			setPCbutton = new Button(x, 37, "Set PC");
 			setPCbutton.Clicked += SetPC;
 
 			void SetPC() {
@@ -185,8 +242,8 @@ namespace LC_Sharp {
 				}
 			}
 
-			setScrollField = new TextField(54, 38, 9, "");
-			setScrollButton = new Button(32, 38, "Set Scroll");
+			setScrollField = new TextField(x + 22, 38, 9, "");
+			setScrollButton = new Button(x, 38, "Set Scroll");
 			setScrollButton.Clicked += SetScroll;
 
 			void SetScroll() {
@@ -206,7 +263,7 @@ namespace LC_Sharp {
 				}
 			}
 
-			assembleDebugButton = new Button(32, 39, "Assemble to PC");
+			assembleDebugButton = new Button(x, 39, "Assemble to PC");
 			assembleDebugButton.Clicked += AssembleDebug;
 			void AssembleDebug() {
 				try {
@@ -223,10 +280,11 @@ namespace LC_Sharp {
 
 			window.Add(runAllButton, runStepOnceButton, runStepOverButton, setPCbutton, setPCfield, setScrollButton, setScrollField, assembleDebugButton);
 
-
+			x += width;
+			width = 58;
 			{
-				var w = new Window(new Rect(64, 1, 54, 16), "Output");
-				output = new TextView(new Rect(0, 0, 52, 14));
+				var w = new Window(new Rect(x, 1, width, 16), "Output");
+				output = new TextView(new Rect(0, 0, width-2, 14));
 				output.Text = "";
 				output.ReadOnly = true;
 				w.Add(output);
@@ -234,16 +292,16 @@ namespace LC_Sharp {
 			}
 
 			{
-				var w = new Window(new Rect(64, 17, 54, 16), "Input");
-				input = new TextView(new Rect(0, 0, 52, 14));
+				var w = new Window(new Rect(x, 17, width, 16), "Input");
+				input = new TextView(new Rect(0, 0, width-2, 14));
 				input.Text = "";
 				w.Add(input);
 				window.Add(w);
 			}
 
 			{
-				var w = new Window(new Rect(64, 33, 54, 25), "Console");
-				console = new TextView(new Rect(0, 0, 52, 24));
+				var w = new Window(new Rect(x, 33, width, 25), "Console");
+				console = new TextView(new Rect(0, 0, width-2, 24));
 				console.Text = "";
 				console.ReadOnly = true;
 				w.Add(console);
@@ -256,7 +314,7 @@ namespace LC_Sharp {
 		}
 
 		public void WriteConsole(string text) {
-			console.Text = $"{console.Text}{text}\n".Replace("\r", "");
+			console.Text = $"{console.Text}{text}\n".Replace("\r", "").Replace("\t", "    ");
 		}
 
 		public void ResetStatus() {
@@ -306,12 +364,15 @@ namespace LC_Sharp {
 		public void UpdateRegisterView() {
 			for (int i = 0; i < 8; i++) {
 				var r = lc3.processing.registers[i];
-				registerLabels[i].Text = $"R{i} {r.ToRegisterString()}".PadRight(30);
+				var s = $"R{i} {r.ToRegisterString()}";
+				registerLabels[i].Text = s;
 			}
 			ccLabel.Text = $"CC {(lc3.processing.N ? 'N' : lc3.processing.Z ? 'Z' : lc3.processing.P ? 'P' : '?')}";
-
-			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}".PadRight(30);
-			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}".PadRight(30);
+			
+			pcLabel.Text = $"PC {lc3.control.pc.ToRegisterString()}";
+			
+			irLabel.Text = $"IR {lc3.control.ir.ToRegisterString()}";
+			
 
 			//Auto update the setter fields
 			setPCfield.Text = $"{lc3.control.pc.ToHexString()}";
@@ -320,8 +381,6 @@ namespace LC_Sharp {
 			string text = "";
 			foreach(var label in assembly.labels.Keys) {
 				short location = assembly.labels[label];
-
-
 				if(((short) (location - lc3.control.pc)).WithinRange(11))
 					text += $"{location.ToHexString()} {label} {lc3.memory.Read(location).ToRegisterString()}\n";
 			}

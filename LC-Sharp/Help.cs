@@ -1,4 +1,6 @@
-﻿namespace LC_Sharp {
+﻿using System.Linq;
+
+namespace LC_Sharp {
     //When the MSB is zero, the other bits represent the absolute value
     //When the MSB is one, the other bits represent the value to add to -2^n
     //If the unsigned value is greater than the max signed value (the MSB must be one), that means we subtract the max unsigned value to get the signed value 
@@ -39,7 +41,14 @@
 		public static string ToHexShort(this int s) {
 			return $"0x{s.ToString("X").PadLeft(4, '0')}";
 		}
-		public static string PadSurround(this string s, int length, char c) => s.PadLeft(s.Length + (length - s.Length) / 2, c).PadRight(length, c);
+
+        public static string PadSegments(this string s) => string.Join(".", s.Split(' ').Select(PadFour));
+
+        public static string PadFour(this string s) => s.PadRight(4 + (s.Length / 4) * 4);
+
+        public static string PadInterval(this string s, int interval) => s.PadRight(interval + (s.Length / interval) * interval);
+
+        public static string PadSurround(this string s, int length, char c) => s.PadLeft(s.Length + (length - s.Length) / 2, c).PadRight(length, c);
 		public static string ToRegisterString(this ushort r) => $"0x{r.ToString("X").PadLeft(4, '0')} #{r.ToString()}";
 		public static string ToRegisterString(this short r) => $"0x{r.ToString("X").PadLeft(4, '0')} #{r.ToString()}";
 		public static string ToHexString(this ushort r) => $"0x{r.ToString("X").PadLeft(4, '0')}";
