@@ -15,7 +15,10 @@ namespace LC_Sharp {
 					{
 						if (Environment.UserInteractive)
 						{
-							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
+							Console.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
+
+							Console.WriteLine("Press Enter to continue");
+							Console.ReadLine();
 							var lc3 = new LC3();
 							var assembly = new Assembler(lc3);
 							assembly.AssembleLines(File.ReadAllText("trap.asm"));
@@ -27,7 +30,9 @@ namespace LC_Sharp {
 						}
 						else
 						{
-							Console.Error.WriteLine("No mode specified or invalid options occured, fallback to CLI mode...");
+							Console.WriteLine("No mode specified or invalid options occured, fallback to CLI mode...");
+							Console.WriteLine("Press Enter to continue");
+							Console.ReadLine();
 							CommandLineMain(new CommandLineOptions()); // TODO (3TUSK): Provide fallback parameters
 							return 0;
 						}

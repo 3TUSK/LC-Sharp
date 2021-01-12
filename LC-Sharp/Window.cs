@@ -106,10 +106,12 @@ namespace LC_Sharp {
 				};
 				window.Add(autoReloadBox);
 
-				Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(0), m => {
-					LoadProgramClick();
-					return false;
-				});
+				if (programFile != null) {
+					Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(0), m => {
+						LoadProgramClick();
+						return false;
+					});
+				}
 
 				void LoadProgramClick() {
 					if (loading) {
