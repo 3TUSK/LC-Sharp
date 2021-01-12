@@ -66,7 +66,7 @@ namespace LC_Sharp {
 			window = new Window(new Rect(0, 0, 150, 60), "LC-Sharp");
 
             {
-				TextField fileField = new TextField(0, 0, 64, programFile);
+				TextField fileField = new TextField(0, 0, 64, programFile ?? "");
 				window.Add(fileField);
 
 				Button loadButton = new Button(64, 0, "Load");
