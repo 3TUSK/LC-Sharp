@@ -69,12 +69,15 @@ namespace LC_Sharp {
 				TextField fileField = new TextField(0, 0, 64, programFile ?? "");
 				window.Add(fileField);
 
+				bool loading = false;
+
+				var loadingLabel = new Label(64, 0, "Loading...");
+				window.Add(loadingLabel);
+
 				Button loadButton = new Button(64, 0, "Load");
-				loadButton.Clicked += LoadProgram;
+				loadButton.Clicked += LoadProgramClick;
 				window.Add(loadButton);
 
-
-				bool loading = false;
 				var lastLoad = programFile != null ? File.GetLastWriteTimeUtc(programFile) : DateTime.Now;
 
 				bool autoReload = false;
@@ -86,15 +89,12 @@ namespace LC_Sharp {
 						autoReload = true;
 						Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(1000), m => {
 							if (autoReload) {
-								if(fileField.Text.Any()) {
-                                    if (!loading) {
-										var time = File.GetLastWriteTimeUtc(fileField.Text.ToString());
-										if (time != lastLoad) {
-											lastLoad = time;
-											LoadProgram();
-										}
+								if(!loading && fileField.Text.Any() && File.Exists(fileField.Text.ToString())) {
+									var time = File.GetLastWriteTimeUtc(fileField.Text.ToString());
+									if (time != lastLoad) {
+										lastLoad = time;
+										LoadProgramClick();
 									}
-									
 								}
 								
 								return true;
@@ -107,50 +107,61 @@ namespace LC_Sharp {
 				window.Add(autoReloadBox);
 
 				Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(0), m => {
-					LoadProgram();
+					LoadProgramClick();
 					return false;
 				});
 
-				void LoadProgram() {
+				void LoadProgramClick() {
+					if (loading) {
+						return;
+					}
 					loading = true;
 
-					window.Remove(loadButton);
-					var loadingLabel = new Label(64, 0, "Loading...");
-					window.Add(loadingLabel);
+					fileField.SetFocus();
 
+					loadingLabel.Visible = true;
+					loadButton.Visible = false;
+					
 					new Thread(() => {
 						try {
-							var programFile = fileField.Text.ToString();
-							var program = File.ReadAllText(programFile);
-							var lc3 = new LC3();
-							var assembly = new Assembler(lc3);
-							assembly.AssembleLines(File.ReadAllText("trap.asm"));
-							assembly.AssembleLines(program);
-
-							output.Text = "";
-							input.Text = "";
-							console.Text = "";
-							assembleDebugField.Text = "";
-							//assembleDebugField.Text = program;
-
-							this.lc3 = lc3;
-							this.assembly = assembly;
-							this.programFile = programFile;
-
-							UpdateRegisterView();
-							UpdateHighlight();
-							UpdateIOView();
-
-							UpdateInstructionsView();
-							ResetStatus();
+							LoadProgram();
 						} catch (Exception e) {
 							WriteConsole(e.Message);
 						} finally {
-							window.Remove(loadingLabel);
-							window.Add(loadButton);
+							loadingLabel.Visible = false;
+							loadButton.Visible = true;
+
 							loading = false;
 						}
 					}).Start();
+				}
+				void LoadProgram() {
+					var programFile = fileField.Text.ToString();
+					var program = File.ReadAllText(programFile);
+					var lc3 = new LC3();
+					var assembly = new Assembler(lc3);
+					assembly.AssembleLines(File.ReadAllText("trap.asm"));
+					assembly.AssembleLines(program);
+
+					//output.Text = "";
+					//input.Text = "";
+					//console.Text = "";
+					//assembleDebugField.Text = "";
+
+					//assembleDebugField.Text = program;
+
+					this.lc3 = lc3;
+					this.assembly = assembly;
+					this.programFile = programFile;
+
+					UpdateRegisterView();
+					UpdateHighlight();
+					UpdateIOView();
+
+					UpdateInstructionsView();
+					ResetStatus();
+
+					WriteConsole($"[{DateTime.Now.ToShortTimeString()}] Loaded file {programFile}");
 				}
 			}
 			int x = 0;

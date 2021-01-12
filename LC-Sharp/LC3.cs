@@ -977,6 +977,8 @@ namespace LC_Sharp {
 			this.operands = operands;
 		}
 		public virtual short Assemble(Assembler context, string[] args) {
+			string argStr = string.Join(" ", args);
+
 			short bitIndex = 12;
 			short result = 0;
 			result |= (short)(code << bitIndex);
@@ -994,10 +996,10 @@ namespace LC_Sharp {
 						break;
 					case Operands.Reg: {
 							if (arg == null) {
-								context.Error($"Missing register in {args}");
+								context.Error($"{name}: Missing register in {argStr}");
 							}
 							if (!context.Register(arg, out short reg)) {
-								context.Error($"Register expected: [{arg}] in {args}");
+								context.Error($"{name}: Register expected: [{argStr}] in {args}");
 							}
 							bitIndex -= 3;
 							result |= (short)(reg << bitIndex);
@@ -1006,11 +1008,11 @@ namespace LC_Sharp {
 						}
 					case Operands.FlagRegImm5: {
 							if (arg == null) {
-								context.Error($"Missing operand in {args}");
+								context.Error($"{name}: Missing operand in {argStr}");
 							}
 							if (!context.Register(arg, out short reg)) {
 								if (!context.Immediate(arg, 5, out short imm5)) {
-									context.Error($"Imm5 value expected: {arg}");
+									context.Error($"{name}: Imm5 value expected: {arg} in {argStr}");
 								} else {
 									bitIndex--;
 									result |= (short)(1 << bitIndex);
@@ -1027,10 +1029,10 @@ namespace LC_Sharp {
 						}
 					case Operands.Imm6: {
 							if (arg == null) {
-								context.Error($"Missing operand in {args}");
+								context.Error($"{name}: Missing operand in {args}");
 							}
 							if (!context.Immediate(arg, 6, out short imm6)) {
-								context.Error($"Imm6 value expected: {arg}");
+								context.Error($"{name}: Imm6 value expected: {arg} in {argStr}");
 							} else {
 								bitIndex -= 6;
 								result |= (short)((imm6 & 0b111111) << bitIndex);
@@ -1040,7 +1042,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset9: {
 							if (arg == null) {
-								context.Error($"Insufficient label in {args}");
+								context.Error($"{name}: Insufficient label in {args}");
 							}
 							bitIndex -= 9;
 							result |= (short)(context.Offset(arg, 9) << bitIndex);
@@ -1049,7 +1051,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset6: {
 							if (arg == null) {
-								context.Error($"Missing label in {args}");
+								context.Error($"{name}: Missing label in {args}");
 							}
 							bitIndex -= 6;
 							result |= (short)(context.Offset(arg, 6) << bitIndex);
@@ -1058,7 +1060,7 @@ namespace LC_Sharp {
 						}
 					case Operands.LabelOffset11: {
 							if (arg == null) {
-								context.Error($"Missing label in {args}");
+								context.Error($"{name}: Missing label in {args}");
 							}
 							bitIndex -= 11;
 							result |= (short)(context.Offset(arg, 11) << bitIndex);

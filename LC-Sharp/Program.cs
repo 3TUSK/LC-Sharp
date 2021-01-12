@@ -19,9 +19,9 @@ namespace LC_Sharp {
 							var lc3 = new LC3();
 							var assembly = new Assembler(lc3);
 							assembly.AssembleLines(File.ReadAllText("trap.asm"));
-							//var program = @"C:\Users\alexm\source\repos\cs061\assn_mu_solution.asm";
-							string program = null;
 							
+							string program = null;
+
 							new Emulator(lc3, assembly, program).Start();
 							return 0;
 						}
