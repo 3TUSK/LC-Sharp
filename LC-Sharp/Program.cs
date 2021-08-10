@@ -23,7 +23,7 @@ namespace LC_Sharp {
 							var assembly = new Assembler(lc3);
 							assembly.AssembleLines(File.ReadAllText("trap.asm"));
 							
-							string program = null;
+							string program = @"C:\Users\alexm\Downloads\encoder.asm";
 
 							new Emulator(lc3, assembly, program).Start();
 							return 0;

@@ -66,22 +66,22 @@ namespace LC_Sharp {
 			window = new Window(new Rect(0, 0, 150, 60), "LC-Sharp");
 
             {
-				TextField fileField = new TextField(0, 0, 64, programFile ?? "");
+				TextField fileField = new TextField(0, 0, 56, programFile ?? "");
 				window.Add(fileField);
 
 				bool loading = false;
 
-				var loadingLabel = new Label(64, 0, "Loading...");
+				var loadingLabel = new Label(56, 0, "Loading...");
 				window.Add(loadingLabel);
 
-				Button loadButton = new Button(64, 0, "Load");
+				Button loadButton = new Button(56, 0, "Load");
 				loadButton.Clicked += LoadProgramClick;
 				window.Add(loadButton);
 
 				var lastLoad = programFile != null ? File.GetLastWriteTimeUtc(programFile) : DateTime.Now;
 
 				bool autoReload = false;
-				CheckBox autoReloadBox = new CheckBox(74, 0, "Auto Reload", false);
+				CheckBox autoReloadBox = new CheckBox(66, 0, "Auto Reload", false);
 				autoReloadBox.Toggled += b => {
 					if(b) {
 						autoReload = false;
@@ -105,6 +105,14 @@ namespace LC_Sharp {
 					}
 				};
 				window.Add(autoReloadBox);
+
+
+
+				var clearOutput = new Button(88, 0, "Clear Output");
+				clearOutput.Clicked += () => {
+					output.Text = "";
+				};
+				window.Add(clearOutput);
 
 				if (programFile != null) {
 					Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(0), m => {
@@ -245,11 +253,16 @@ namespace LC_Sharp {
 					} else {
 						pc = short.Parse(s.Substring(1));
 					}
+
+					if(pc == lc3.control.pc) {
+						return;
+                    }
 					lc3.control.setPC(pc);
 					WriteConsole($"PC set to {pc.ToHexString()}");
-					lc3.status = LC3.Status.ACTIVE;
+					lc3.Unhalt();
 					UpdateRegisterView();
 					UpdateHighlight();
+					ResetStatus();
 				} catch (Exception e) {
 					WriteConsole(e.Message);
 				}
@@ -276,7 +289,7 @@ namespace LC_Sharp {
 				}
 			}
 
-			assembleDebugButton = new Button(x, 39, "Assemble to PC");
+			assembleDebugButton = new Button(x, 39, "Assemble at PC");
 			assembleDebugButton.Clicked += AssembleDebug;
 			void AssembleDebug() {
 				try {
@@ -420,8 +433,10 @@ namespace LC_Sharp {
 				StopRunAll();
 			} else {
 				//we don't run if the lc3 is halted
-				if (!lc3.Active)
+				if (!lc3.Active) {
+					WriteConsole($"Machine is halted");
 					return;
+				}
 				running = true;
 				//Application.MainLoop.AddIdle(RunAll);
 				AddTimer(RunAll);
@@ -441,6 +456,7 @@ namespace LC_Sharp {
 				//Stop running if needed
 				if (!running) {
 					StopRunAll();
+					WriteConsole($"Machine paused");
 					return false;
 				}
 
@@ -449,6 +465,7 @@ namespace LC_Sharp {
 				} else {
 					//Otherwise we are done running
 					StopRunAll();
+					WriteConsole($"Program halted");
 					return false;
 				}
 			}
@@ -458,8 +475,10 @@ namespace LC_Sharp {
 				StopRunStepOnce();
 			} else {
 				//we don't run if the lc3 is halted
-				if (!lc3.Active)
+				if (!lc3.Active) {
+					WriteConsole($"Program is halted");
 					return;
+				}
 				running = true;
 				//Application.MainLoop.AddIdle(RunStepOnce);
 				AddTimer(RunStepOnce);
@@ -478,15 +497,18 @@ namespace LC_Sharp {
 				//Stop running if needed
 				if (!running) {
 					StopRunStepOnce();
+					WriteConsole($"Program paused");
 					return false;
 				}
 
 				//If we are running a TRAP instruction, we should wait for it to finish
 				if (lc3.status == LC3.Status.TRAP) {
 					ResetStatus();
+					WriteConsole($"Entered TRAP");
 					return true;
 				} else {
 					StopRunStepOnce();
+					WriteConsole($"Program paused");
 					return false;
 				}
 			}
@@ -498,8 +520,10 @@ namespace LC_Sharp {
 				StopRunStepOver();
 			} else {
 				//we don't run if the lc3 is halted
-				if (!lc3.Active)
+				if (!lc3.Active) {
+					WriteConsole($"Program is halted");
 					return;
+				}
 				running = true;
 				//Application.MainLoop.AddIdle(RunStepOver);
 				AddTimer(RunStepOver);
@@ -519,16 +543,19 @@ namespace LC_Sharp {
 				//Stop running if needed
 				if(!running) {
 					StopRunStepOver();
+					WriteConsole($"Program paused");
 					return false;
 				}
 				//If we are running a TRAP instruction, we should wait for it to finish
 				if (lc3.status == LC3.Status.TRAP) {
 					ResetStatus();
+					WriteConsole($"Entered TRAP");
 					return true;
 				} else if (lc3.control.pc != pcDest) {
 					return true;
 				} else {
 					StopRunStepOver();
+					WriteConsole($"Program paused");
 					return false;
 				}
 			}
@@ -558,7 +585,7 @@ namespace LC_Sharp {
 			UpdateIOView();
 
 			if (assembly.breakpoints.Contains(lc3.control.pc)) {
-				console.Text = $"{console.Text.ToString().Replace("\r", "")}Reached breakpoint at {lc3.control.pc.ToHexString()};\nProgram execution paused.\n";
+				console.Text = $"{console.Text.ToString().Replace("\r", "")}Reached breakpoint at {lc3.control.pc.ToHexString()};\nProgram paused.\n";
 				running = false;
 				return;
 			}

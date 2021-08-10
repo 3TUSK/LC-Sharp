@@ -10,7 +10,9 @@ namespace LC_Sharp {
 		public Processing processing;
 		public Memory memory;
 		public short bus;
-		private bool halted => (((memory.Read(unchecked ((short)0xFFFE))) & 0x8000) == 0);
+
+		public const short mcr = unchecked((short)0xFFFE);
+		private bool halted => ((memory.Read(mcr) & 0x8000) == 0);
 		public enum Status {
 			ACTIVE, TRAP, ERROR, HALT
 		}
@@ -277,6 +279,10 @@ namespace LC_Sharp {
 				status = Status.HALT;
 			}
 		}
+		public void Unhalt() {
+			memory.Write(mcr, (short)(memory.Read(mcr) | 0x8000));
+			status = Status.ACTIVE;
+		}
 	}
 
 
@@ -511,10 +517,12 @@ namespace LC_Sharp {
 
 			//This might be a FILLED value, but we can't tell
 			if(nonInstruction.Contains((short) (pc))) {
-				if (Lookup((short)(pc), out string label))
-					return $"{label.PadRight(30)} {lc3.memory.Read((short) (pc)).ToHexString()}";
-				else
-					return $"[DATA] {lc3.memory.Read((short)(pc)).ToHexString()}";
+				var value = lc3.memory.Read((short)(pc));
+				if (Lookup((short)(pc), out string label)) {
+					return $"{label.PadRight(12)} {value.ToHexString()} #{value,-8} {(char)value}";
+				}  else {
+					return $"{new string(' ', 12)} {value.ToHexString()} #{value,-8} {(char)value}";
+				}
 			}
 
 			//For TRAP Subroutines, we consider their entire code to be an opcode
