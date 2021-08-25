@@ -13,6 +13,7 @@ namespace LC_Sharp {
 					(CommandLineOptions options) => CommandLineMain(options),
 					err => // Fall back to GUI directly if not parsed.
 					{
+						return 0;
 						if (Environment.UserInteractive)
 						{
 							Console.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
@@ -91,11 +92,10 @@ namespace LC_Sharp {
 				assembly.AssembleToPC(File.ReadAllLines(options.program));
 			}
 			string input = options.input != null ? File.ReadAllText(options.input) : null;
-			string output = options.output != null ? File.ReadAllText(options.output) : null;
-			Console.WriteLine("Assembly successful, launching LC3 Finite State Machine...");
-			Console.CursorVisible = false;
+			string output = options.output != null ? File.ReadAllText(options.output).Replace("\r", null) : null;
+			Console.WriteLine("Assembly successful. Launching machine.");
+			Console.CursorVisible = true;
 			new Terminal(lc3, assembly, input, output).Start();
-			Console.WriteLine("LC3 Finite State Machine halted without exception.");
 			return 0;
 		}
 	}    

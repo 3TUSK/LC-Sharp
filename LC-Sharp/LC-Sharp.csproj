@@ -52,7 +52,16 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="in.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="out.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="trap.asm" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="truth.asm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.4.3" />

@@ -82,12 +82,14 @@ namespace LC_Sharp {
 								if(fixedOutput[0] != c) {
 									Console.WriteLine();
 									Console.WriteLine("Error: Program output did not match fixed output.");
+									break;
 								}
 								//Remove the first char
 								fixedOutput = fixedOutput.Substring(1);
 							} else {
 								Console.WriteLine();
 								Console.WriteLine("Error: Program had more output than expected.");
+								break;
 							}
 						}
 					}
@@ -98,8 +100,7 @@ namespace LC_Sharp {
 			if(fixedInput?.Length > 0) {
 				Console.WriteLine($"Program halted with extra input remaining: {fixedInput}");
 			}
-			Console.WriteLine("Program halted. Press Enter to exit");
-			Console.ReadLine();
+			Console.WriteLine("Program terminated.");
 		}
 	}
 }

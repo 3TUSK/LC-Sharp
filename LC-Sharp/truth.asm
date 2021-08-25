@@ -1,0 +1,32 @@
+.ORIG x3000
+
+LD R1, ZERO
+NOT R1, R1
+ADD R1, R1, #1
+
+LEA R0, INTRO
+PUTS
+
+REPEAT
+
+LD R0, NL
+OUT
+
+LEA R0, ENTER
+PUTS
+
+GETC
+OUT
+
+ADD R0, R0, R1
+BRnp REPEAT
+
+HALT
+
+ZERO .FILL '0'
+
+HALT
+INTRO .STRINGZ "Welcome to the Truth Machine."
+ENTER .STRINGZ "Enter a digit: "
+REPLY .STRINGZ "Entered: "
+NL .FILL '\n'

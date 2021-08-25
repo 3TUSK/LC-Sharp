@@ -1,0 +1,11 @@
+﻿Welcome to the Truth Machine.
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 9
+Enter a digit: 0
+Halting the machine.
