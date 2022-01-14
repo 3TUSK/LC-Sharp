@@ -13,7 +13,6 @@ namespace LC_Sharp {
 					(CommandLineOptions options) => CommandLineMain(options),
 					err => // Fall back to GUI directly if not parsed.
 					{
-						return 0;
 						if (Environment.UserInteractive)
 						{
 							Console.WriteLine("No mode specified or invalid options occured, fallback to GUI mode...");
